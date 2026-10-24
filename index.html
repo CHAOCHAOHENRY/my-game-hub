@@ -216,7 +216,7 @@ var RANK_VAL = {}; RANK_ORDER.forEach(function(r,i){ RANK_VAL[r]=i; });
 var SUIT_VAL = {c:0, h:1, s:2, d:3};
 var TYPE_CN = {single:'单张', pair:'对子', triple:'三条', straight:'顺子', flush:'同花', full:'葫芦', bomb:'金刚', sf:'同花顺'};
 var IMG_BACK = 'cards/back1.png';
-var AI_NAMES = ['阿宝','阿花','阿东'];
+var AI_NAMES = ['瑞珍','艳芬','宝红'];
 var MAX_TURNS = 400;
 
 function strength(card){ return RANK_VAL[card.r]*4 + SUIT_VAL[card.s]; }
