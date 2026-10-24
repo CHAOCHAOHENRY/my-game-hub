@@ -53,7 +53,8 @@ input, button { outline:none; }
 .seat .nameplate .cnt { color:#ffd75e; font-size:12px; margin-left:6px; }
 .seat .tagline { font-size:11px; color:#9fe3ff; margin-top:1px; margin-bottom:4px; min-height:14px; position:relative; z-index:2; }
 .seat .opp-hand { margin-top:2px; }
-.seat .opp-hand img { width:58px; height:auto; margin:0 -24px 0 0; }
+/* 优化：对手牌也固定高度 */
+.seat .opp-hand img { width:58px; height:81px; object-fit:contain; margin:0 -24px 0 0; }
 .seat .finish-note { color:#7ef08a; font-size:12px; }
 
 #trick-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); min-width:330px; z-index:15; text-align:center; }
@@ -62,20 +63,21 @@ input, button { outline:none; }
   background:rgba(0,0,0,0.62); border:1px solid rgba(247,233,176,0.4); border-radius:8px;
   padding:3px 10px; margin-bottom:4px; font-size:13px; color:#ffe98a; white-space:nowrap; }
 
-
-.trick-cards { display:flex; justify-content:center; align-items:center; min-height:18px; }
-.trick-cards img { width:165px; height:auto; }
+/* 优化：出牌区固定高度 */
+.trick-cards { display:flex; justify-content:center; align-items:center; min-height:231px; }
+.trick-cards img { width:165px; height:231px; object-fit:contain; }
 .trick-cards img:not(:last-child) { margin-right:-52px; }
 .trick-cards .empty { color:#bcd8c0; font-size:15px; }
-@media (max-height:640px) { .trick-cards img { width:135px; } }
-@media (max-height:560px) { .trick-cards img { width:115px; } }
-@media (max-height:520px) { .trick-cards img { width:100px; } }
+@media (max-height:640px) { .trick-cards { min-height:189px; } .trick-cards img { width:135px; height:189px; } }
+@media (max-height:560px) { .trick-cards { min-height:161px; } .trick-cards img { width:115px; height:161px; } }
+@media (max-height:520px) { .trick-cards { min-height:140px; } .trick-cards img { width:100px; height:140px; } }
 
 #statusline { position:absolute; top:48px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.6); padding:5px 18px; border-radius:20px; font-size:14px; z-index:20; white-space:nowrap; max-width:92%; }
 
 #myzone { position:absolute; bottom:0; left:0; right:0; height:200px; background:linear-gradient(rgba(0,0,0,0.2),rgba(0,0,0,0.6)); border-top:2px solid #f7e9b0; z-index:25; }
 #my-hand { position:absolute; top:6px; left:50%; transform:translateX(-50%); display:flex; justify-content:center; }
-#my-hand img { width:100px; height:auto; margin:0 -28px; cursor:pointer; transition:transform 0.12s; }
+/* 优化：自己手牌固定高度 */
+#my-hand img { width:100px; height:140px; object-fit:contain; margin:0 -28px; cursor:pointer; transition:transform 0.12s; }
 #my-hand img.sel { transform:translateY(-22px); }
 #my-ctrl { position:absolute; bottom:8px; left:0; right:0; text-align:center; }
 #my-ctrl button { font-size:17px; font-weight:bold; padding:8px 24px; border-radius:10px; border:none; margin:0 8px; }
@@ -187,14 +189,24 @@ input, button { outline:none; }
 <script>
 /* ===================================================================
    广东斗地主（四人锄大地变体）
-   点数：3 > 2 > A > K > Q > J > 10 > 9 > 8 > 7 > 6 > 5 > 4
-   花色：方块 > 黑桃 > 红桃 > 梅花
-   牌型：单张/对子/三条/顺子(5)/同花(5)/葫芦(3+2)/金刚(4+1)/同花顺(5)
-   组队：方块3 与 方块A 分属两人 → 这两张牌持有者一队；
-         双牌同人 → 以一敌三（叫地主 / 不表示 / 弃牌）
    =================================================================== */
 (function(){
 "use strict";
+
+/* ---------------- 优化：预加载所有图片 ---------------- */
+function preloadAllCards() {
+    var suits = ['c','h','s','d'];
+    var ranks = ['4','5','6','7','8','9','10','J','Q','K','A','2','3'];
+    suits.forEach(function(s) {
+        ranks.forEach(function(r) {
+            var img = new Image();
+            img.src = 'cards/' + s + r + '.png';
+        });
+    });
+    var back = new Image();
+    back.src = 'cards/back1.png';
+}
+preloadAllCards(); // 网页一打开立刻执行预加载
 
 /* ---------------- 常量 ---------------- */
 var SUIT_ORDER = ['c','h','s','d'];                 // 梅花<红桃<黑桃<方块
@@ -220,8 +232,6 @@ function fmt(v){ return (v>0?'+':'')+v; }
 function pad(n){ return n<10 ? '0'+n : ''+n; }
 
 /* ---------------- 牌型识别 ---------------- */
-/* 合法顺子表：顶牌 -> 该顺子包含的点数集合（按 RANK_VAL 排序）
-   规则：A2345 最小，10JQKA 最大；2、3 可进顺子，但只能作小牌连接 */
 var STRAIGHT_TABLE = (function(){
   var tops = ['5','6','7','8','9','10','J','Q','K','A'];
   var sets = [
@@ -275,7 +285,7 @@ function analyze(cards){
     var sameSuit = d.every(function(x){ return x.s===d[0].s; });
     var straightTop = detectStraight(ranks);
     if (straightTop){
-      var skey = RANK_VAL[straightTop];   // 顶牌决定顺子大小：A2345<23456<…<10JQKA
+      var skey = RANK_VAL[straightTop];
       if (sameSuit) return {type:'sf', key:skey, r:straightTop, s:d[0].s};
       return {type:'straight', key:skey, r:straightTop, s:d[0].s};
     }
@@ -286,70 +296,37 @@ function analyze(cards){
 }
 
 function flushGT(a, base){
-  // 1. 优先比较花色（方块 d > 黑桃 s > 红桃 h > 梅花 c）
-  // 因为同花是5张一样的花色，直接取第一张判断即可
   var suitA = a.seq[0].s;
   var suitB = base.seq[0].s;
-  
-  if (suitA !== suitB) {
-    return SUIT_VAL[suitA] > SUIT_VAL[suitB];
-  }
-
-  // 2. 如果是同一种花色，依次比较点数（a.seq 和 base.seq 已按点数降序排列）
-  // 先比最大，一样大再比第二大，以此类推
+  if (suitA !== suitB) return SUIT_VAL[suitA] > SUIT_VAL[suitB];
   for (var i=0;i<5;i++){
     var rankA = RANK_VAL[a.seq[i].r];
     var rankB = RANK_VAL[base.seq[i].r];
     if (rankA !== rankB) return rankA > rankB;
   }
-  
-  return false; // 完全相同（理论上不可能，因为牌是唯一的）
+  return false;
 }
-
 
 function canBeat(p, base){
   if (!p) return false;
   if (!base) return true;
-
-  // 1. 定义阶梯压制链的等级（数字越大越厉害）
-  // 顺子(1) < 同花(2) < 葫芦(3) < 金刚(4) < 同花顺(5)
-  var typeRank = {
-    'straight': 1,
-    'flush': 2,
-    'full': 3,
-    'bomb': 4,
-    'sf': 5
-  };
-
+  var typeRank = { 'straight': 1, 'flush': 2, 'full': 3, 'bomb': 4, 'sf': 5 };
   var pRank = typeRank[p.type] || 0;
   var baseRank = typeRank[base.type] || 0;
-
-  // 2. 处理压制链的牌型
   if (pRank > 0 && baseRank > 0) {
-    if (pRank > baseRank) return true;  // 等级高，可以直接压
-    if (pRank < baseRank) return false; // 等级低，压不住
-    // 等级相同（比如都是顺子，或都是炸弹），继续往下走比大小
+    if (pRank > baseRank) return true;
+    if (pRank < baseRank) return false;
   } else {
-    // 3. 处理不在压制链里的牌型（单张、对子、三条）
-    // 规则：必须类型完全相同才能打
     if (p.type !== base.type) return false;
   }
-
-  // 4. 同花特殊比较（逐张比）
   if (p.type === 'flush') return flushGT(p, base);
-
-  // 5. 相同等级/相同牌型，比主点数 key
   if (p.key > base.key) return true;
   if (p.key < base.key) return false;
-
-  // 6. 如果主点数一样，再比花色
   if (p.key === base.key){
-    if (p.type === 'single' || p.type === 'pair' ||
-        p.type === 'straight' || p.type === 'sf'){
+    if (p.type === 'single' || p.type === 'pair' || p.type === 'straight' || p.type === 'sf'){
       return SUIT_VAL[p.s] > SUIT_VAL[base.s];
     }
   }
-  
   return false;
 }
 
@@ -365,7 +342,6 @@ function holder(h,s,r){ for (var i=0;i<4;i++) if (has(h[i], s+r)) return i; retu
 
 /* ---------------- AI ---------------- */
 var AI = {};
-
 AI.allPlays = function(hand){
   var P = [];
   hand.forEach(function(c){ P.push({cards:[c]}); });
@@ -395,50 +371,26 @@ AI.allPlays = function(hand){
 AI.findBeat = function(hand, base){
   var all = AI.allPlays(hand), best=null, bestScore=1e9;
   var handCounts = rc(hand);
-  
   for (var i=0;i<all.length;i++){
     if (!all[i].play) continue;
     if (canBeat(all[i].play, base)){
-      var score = all[i].play.key; // 基础分数，越小越好
-      
-      // 【1. 跨牌型惩罚】：如果跨牌型压制（比如用葫芦压顺子），加极大惩罚（尽量同牌型打）
-      if (all[i].play.type !== base.type) {
-          score += 5000; 
-      }
-      
-      // 【2. 拆牌惩罚】：拆对子或三条打单张，狠狠惩罚
-      if (all[i].play.type === 'single' && handCounts[all[i].cards[0].r] > 1) {
-          score += 2000; 
-      }
-      if (all[i].play.type === 'pair' && handCounts[all[i].cards[0].r] >= 3) {
-          score += 1000; // 拆三条打对子
-      }
-      
-      // 【3. 保底牌惩罚】：炸弹和同花顺极其珍贵，不到万不得已不出
-      if (all[i].play.type === 'bomb' || all[i].play.type === 'sf') {
-          score += 8000; 
-      }
-
+      var score = all[i].play.key;
+      if (all[i].play.type !== base.type) score += 5000;
+      if (all[i].play.type === 'single' && handCounts[all[i].cards[0].r] > 1) score += 2000;
+      if (all[i].play.type === 'pair' && handCounts[all[i].cards[0].r] >= 3) score += 1000;
+      if (all[i].play.type === 'bomb' || all[i].play.type === 'sf') score += 8000;
       if (score < bestScore){ bestScore = score; best = all[i]; }
     }
   }
   return best;
 };
-
 AI.lead = function(hand){
   var all = AI.allPlays(hand), i, cand;
-  var sortedHand = desc(hand);
-  
-  // ----- 优化后的领出逻辑 -----
-  // 能一把出完直接出
   for (i=0;i<all.length;i++) if (all[i].cards.length===hand.length) return all[i];
-
-  // 残局智商（<= 6张）：找最优规划，留好牌
   if (hand.length > 1 && hand.length <= 6) {
       var bestPlan = null, bestRemainder = 99;
       var planCand = all.filter(function(e){ return e.play && e.play.type !== 'bomb' && e.play.type !== 'sf'; });
-      if (planCand.length === 0) planCand = all; // 只剩炸弹没得选
-
+      if (planCand.length === 0) planCand = all;
       for (i=0;i<planCand.length;i++){
          if (planCand[i].play) {
              var cardsLeft = hand.length - planCand[i].cards.length;
@@ -450,41 +402,21 @@ AI.lead = function(hand){
       }
       if (bestPlan && bestRemainder <= 4) return bestPlan;
   }
-
-  // 排除炸弹和同花顺（留作底牌）
   var normalCand = all.filter(function(e){ return e.play && e.play.type !== 'bomb' && e.play.type !== 'sf'; });
   if (normalCand.length === 0) normalCand = all;
-
-  // 优先出别人难接的牌：同花 -> 葫芦 -> 顺子
   cand = normalCand.filter(function(e){ return e.play && e.play.type==='flush'; }).sort(function(a,b){ return a.play.key-b.play.key; });
   if (cand.length) return cand[0];
-  
   cand = normalCand.filter(function(e){ return e.play && e.play.type==='full'; }).sort(function(a,b){ return a.play.key-b.play.key; });
   if (cand.length) return cand[0];
-  
   cand = normalCand.filter(function(e){ return e.play && e.play.type==='straight'; }).sort(function(a,b){ return a.play.key-b.play.key; });
   if (cand.length) return cand[0];
-
-  // 最后出三条、对子、单张（尽量出小的）
   cand = normalCand.filter(function(e){ return e.play && e.play.type==='triple'; }).sort(function(a,b){ return a.play.key-b.play.key; });
   if (cand.length) return cand[0];
-
   cand = normalCand.filter(function(e){ return e.play && e.play.type==='pair'; }).sort(function(a,b){ return a.play.key-b.play.key; });
   if (cand.length) return cand[0];
-
   cand = normalCand.filter(function(e){ return e.play && e.play.type==='single'; }).sort(function(a,b){ return strength(a.cards[0])-strength(b.cards[0]); });
   return cand[0] || all[0];
-
-
-
-
-
-  
 };
-
-
-
-
 AI.leadFirst = function(hand){
   var all = AI.allPlays(hand).filter(function(e){ return e.cards.some(function(x){ return x.id==='c4'; }); });
   if (all.length){
@@ -493,7 +425,6 @@ AI.leadFirst = function(hand){
   }
   return {cards:[mk('c','4')]};
 };
-
 AI.chooseIdentity = function(hand){
   var d = desc(hand), top5=0, total=0;
   for (var i=0;i<Math.min(5,d.length);i++) top5 += strength(d[i]);
@@ -502,53 +433,36 @@ AI.chooseIdentity = function(hand){
   if (total <= 250) return 'fold';
   return 'hidden';
 };
-
 AI.follow = function(hand, g){
   var base = g.currentPlay ? g.currentPlay.play : null;
   if (!base) return null;
-  // 【新增】一打三（叫地主）模式：holder 是地主，其余三人互为平民队友
   if (g.role==='landlord'){
     var myIsHolder  = (g.turn === g.holderSeat);
     var leadIsHolder = (g.currentPlay.seat === g.holderSeat);
-    // 我方和平民队友都出了牌 → 不能压，要让队友走
     if (!myIsHolder && !leadIsHolder){
-      // 唯一例外：如果这一手能一把出完，那就出
       var all0 = AI.allPlays(hand);
       for (var i0=0;i0<all0.length;i0++){
         if (all0[i0].cards.length===hand.length && canBeat(all0[i0].play, base)) return all0[i0];
       }
-      return null;   // 不压队友
+      return null;
     }
   }  
-
-
   if (g.role==='team' && base){
     var myTeam = (g.turn===g.d3Seat || g.turn===g.daSeat) ? 0 : 1;
     var leadTeam = (g.currentPlay.seat===g.d3Seat || g.currentPlay.seat===g.daSeat) ? 0 : 1;
-    
-    // 1. 如果当前出牌的是队友（队友出牌，自己跟着压）
     if (myTeam===leadTeam){
       var all = AI.allPlays(hand);
-      // 如果自己能一次性出完，那就出！
       for (var i=0;i<all.length;i++){
         if (all[i].cards.length===hand.length && canBeat(all[i].play, base)) return all[i];
       }
-      // 【新增】如果队友手里只剩 1 或 2 张牌，绝对不压队友，帮队友兜底
       if (g.hands[g.currentPlay.seat].length <= 2) return null; 
-      
-      // 其他情况不压队友
       return null; 
     }
-    
-    // 2. 如果当前出牌的是对手
     if (myTeam !== leadTeam) {
-       // 找队友的位置
-                 // 找队友的位置（区分阵营 0 和阵营 1）
            var mateSeat = -1;
            if (myTeam === 0) {
                mateSeat = (g.turn === g.d3Seat) ? g.daSeat : g.d3Seat;
            } else {
-               // 如果我是普通组（阵营1），队友是除了方块3、方块A和自己之外的第四人
                for (var ss = 0; ss < 4; ss++) {
                    if (ss !== g.d3Seat && ss !== g.daSeat && ss !== g.turn) {
                        mateSeat = ss;
@@ -556,7 +470,6 @@ AI.follow = function(hand, g){
                    }
                }
            }
-       // 【新增】如果队友只剩 1 张牌，而且对手出的是单张，拼了命也要拿最大的单张压住，给队友制造出牌机会
        if (g.hands[mateSeat] && g.hands[mateSeat].length === 1 && base.type === 'single') {
            var maxBeat = null; 
            var maxKey = -1;
@@ -566,16 +479,12 @@ AI.follow = function(hand, g){
                    if (all[i].play.key > maxKey) { maxKey = all[i].play.key; maxBeat = all[i]; }
                }
            }
-           if (maxBeat) return maxBeat; // 直接砸最大的！
+           if (maxBeat) return maxBeat;
        }
     }
   }
-  
-  // 正常情况，找最小的牌压对手
   return AI.findBeat(hand, base);
 };
-
-
 
 /* ---------------- 对局状态机 ---------------- */
 function newGameState(players, handNo, carryScores){
@@ -589,7 +498,7 @@ function newGameState(players, handNo, carryScores){
     d3Seat: d3, daSeat: da, c4Holder: c4,
     isSolo: isSolo, holderSeat: isSolo ? d3 : -1,
     role: isSolo ? null : 'team',
-    phase: 'identity',          // identity / play / handEnd
+    phase: 'identity',
     turn: c4,
     trickNo: 0,
     trickLeader: c4,
@@ -604,9 +513,7 @@ function newGameState(players, handNo, carryScores){
     seatUids: players.map(function(p){ return p.uid || null; })
   };
 }
-
 function seatName(g,i){ return g.players[i] ? g.players[i].name : '玩家'+(i+1); }
-
 function applyPlay(g, seat, cards){
   var play = analyze(clone(cards));
   if (!play) return {ok:false, msg:'牌型不合法'};
@@ -615,9 +522,9 @@ function applyPlay(g, seat, cards){
     return {ok:false, msg:'首手必须包含梅花4'};
   }
   if (g.currentPlay){
-  if (!g.currentPlay.play) return {ok:false, msg:'上家牌型异常，请重新开局'};
-  if (!canBeat(play, g.currentPlay.play)) return {ok:false, msg:'打不过上家'};
-}
+    if (!g.currentPlay.play) return {ok:false, msg:'上家牌型异常，请重新开局'};
+    if (!canBeat(play, g.currentPlay.play)) return {ok:false, msg:'打不过上家'};
+  }
   cards.forEach(function(c){
     for (var i=g.hands[seat].length-1;i>=0;i--){
       if (g.hands[seat][i].id===c.id){ g.hands[seat].splice(i,1); break; }
@@ -634,14 +541,10 @@ function applyPlay(g, seat, cards){
   }
   return {ok:true};
 }
-
 function applyPass(g, seat){ g.passCount++; }
-
 function shouldEnd(g){
   if (g.role==='landlord') return g.finishOrder.length>=1;
-  // 单人 hidden 模式：持双牌者出完即结束
   if (g.role==='hidden' && g.finishOrder.indexOf(g.holderSeat)>=0) return true;
-  // 2v2：同组包揽前两名即提前结束
   if (g.role==='team' && g.finishOrder.length>=2){
     var first = g.finishOrder[0], second = g.finishOrder[1];
     var tFirst  = (first===g.d3Seat  || first===g.daSeat) ? 0 : 1;
@@ -650,7 +553,6 @@ function shouldEnd(g){
   }
   return g.finishOrder.length>=3;
 }
-
 function settle(g){
   var d=[0,0,0,0], order=g.finishOrder.slice(), holder=g.holderSeat;
   while (order.length<4){
@@ -658,7 +560,6 @@ function settle(g){
   }
   var nm = g.players.map(function(p){ return p.name; });
   function add(s,v){ d[s]+=v; }
-
   if (g.role==='fold'){
     add(holder,-3); add((holder+1)%4,1); add((holder+2)%4,1); add((holder+3)%4,1);
     g.resultText = nm[holder]+' 弃牌认输：-3 分（其余各 +1）';
@@ -686,7 +587,7 @@ function settle(g){
     else { add(holder,-6); for(var cc=0;cc<4;cc++) if(cc!==holder) add(cc,2);
       g.resultText = nm[holder]+'（不表示）走第4：-6 分（其余各 +2）'; }
   }
-  else { // team 2v2
+  else {
     var first = order[0];
     var t1 = (first===g.d3Seat||first===g.daSeat) ? 0 : 1;
     var mate=-1;
@@ -705,7 +606,6 @@ function settle(g){
   g.phase = 'handEnd';
   return d;
 }
-
 function nextTurn(g){
   if (shouldEnd(g)){ if (g.phase!=='handEnd') settle(g); return -1; }
   var active=[]; for (var i=0;i<4;i++) if (!g.finished[i]) active.push(i);
@@ -718,7 +618,6 @@ function nextTurn(g){
     var others = active.filter(function(s){ return s!==g.trickLeader; });
     if (g.passCount >= others.length){
       g.currentPlay = null; g.passCount = 0;
-      // 新一轮由上轮出牌者（若已走完则顺延到下一活跃玩家）领出
       g.turn = g.trickLeader;
       for (var k=0;k<4;k++){
         var tt=(g.trickLeader+k)%4;
@@ -740,13 +639,13 @@ function nextTurn(g){
 var G = null;
 var mySeat = 0;
 var myUid = null;
-var mode = 'solo';          // 'solo' | 'lan'
+var mode = 'solo';
 var isHost = false;
 var selectedCount = 0;
 var selectedIds = {};
 var aiTimer = null;
 var modalShown = false;
-var onlineMap = {};         // uid -> bool
+var onlineMap = {}; 
 var WS_SERVER = (location.protocol==='http:'||location.protocol==='https:') ? location.origin : null;
 
 function $(id){ return document.getElementById(id); }
@@ -769,24 +668,21 @@ function renderTop(){
   $('handno').textContent='第 '+G.handNo+' 局';
   $('mode-tag').textContent = mode==='lan' ? (isHost?'局域网·房主':'局域网') : '单机';
 }
-
 function teamTag(g,seat){
   if (g.role==='landlord') return seat===g.holderSeat ? '地主' : '平民';
-  if (g.role==='hidden')   return '';  // 不表示：完全不显示任何身份标识
+  if (g.role==='hidden')   return '';
   if (g.role==='team'){
     var t = (seat===g.d3Seat||seat===g.daSeat) ? 0 : 1;
     return t===0 ? '持牌组' : '普通组';
   }
   return '';
 }
-
 function renderSeat(seat){
   if (!G) return;
   var box = $('seat-'+seat);
   var isMe = (seat===mySeat);
   var cnt = G.hands[seat] ? G.hands[seat].length : 0;
   var html = '';
-  // 在线状态灯
   var stHtml = '';
   if (mode==='lan'){
     var uid = G.players[seat] ? G.players[seat].uid : null;
@@ -829,15 +725,12 @@ function renderTrick(){
   if (!G) return;
   var el = $('trick-center');
   var stat = $('trick-status');
-
   var title='';
   if (G.phase==='handEnd') title=esc(G.resultText||'本局结束');
   else if (G.phase==='play') title = '轮到 '+esc(seatName(G,G.turn))+' 出牌'
     + (!G.firstLeadDone && G.turn===G.c4Holder ? '（首手需含♣4）' : '');
-
   var lines = '';
   if (title) lines += '<div class="line">'+title+'</div>';
-
   var ch = '';
   if (G.currentPlay){
     var p = G.currentPlay;
@@ -848,12 +741,9 @@ function renderTrick(){
   } else {
     ch = '<div class="trick-cards"><span class="empty">新一轮，等待领出…</span></div>';
   }
-
   stat.innerHTML = lines;
   el.innerHTML = ch;
 }
-
-
 function renderMyHand(){
   if (!G) return;
   var html='';
@@ -875,7 +765,6 @@ function renderMyHand(){
     })(imgs[j]);
   }
 }
-
 function renderCtrl(){
   if (!G){ $('ctrl-note').textContent=''; return; }
   var myTurn = (G.phase==='play' && G.turn===mySeat && !G.finished[mySeat]);
@@ -889,7 +778,6 @@ function renderCtrl(){
   else if (G.phase==='handEnd') note='本局已结束';
   $('ctrl-note').textContent=note;
 }
-
 function renderAll(){
   if (!G) return;
   renderTop();
@@ -910,14 +798,13 @@ function humanPlay(){
   if (!cards.length) return;
   var p = analyze(clone(cards));
   if (!p){ feed('牌型不合法'); return; }
- if (G.currentPlay){
-  if (!G.currentPlay.play){ feed('上家牌型异常，请重新开局'); return; }
-  if (!canBeat(p, G.currentPlay.play)){ feed('打不过上家'); return; }
-}
+  if (G.currentPlay){
+    if (!G.currentPlay.play){ feed('上家牌型异常，请重新开局'); return; }
+    if (!canBeat(p, G.currentPlay.play)){ feed('打不过上家'); return; }
+  }
   if (!G.firstLeadDone && G.turn===G.c4Holder && !has(cards,'c4')){ feed('首手必须包含梅花4'); return; }
   if (mode==='lan' && !isHost){
     send({kind:'play', seat:mySeat, ids:cards.map(function(c){return c.id;})});
-    // 本地先删除（公共状态随后同步）
     cards.forEach(function(c){
       for (var i=G.hands[mySeat].length-1;i>=0;i--) if (G.hands[mySeat][i].id===c.id){ G.hands[mySeat].splice(i,1); break; }
     });
@@ -944,7 +831,6 @@ function humanPass(){
   feed('你过牌');
   afterAction();
 }
-
 function afterAction(){
   if (!G) return;
   var nx = nextTurn(G);
@@ -954,7 +840,6 @@ function afterAction(){
   renderAll();
   scheduleAI();
 }
-
 function scheduleAI(){
   if (aiTimer) clearInterval(aiTimer);
   aiTimer = setInterval(function(){
@@ -962,10 +847,10 @@ function scheduleAI(){
     var s = G.turn;
     if (!(G.players[s] && G.players[s].isAI)){ clearInterval(aiTimer); return; }
     clearInterval(aiTimer);
-    setTimeout(function(){ aiAct(s); }, 650);
+    // 优化：把 650 改为 350，加快电脑出牌速度
+    setTimeout(function(){ aiAct(s); }, 350);
   }, 150);
 }
-
 function aiAct(seat){
   if (!G || G.phase!=='play' || G.turn!==seat) return;
   var hand = clone(G.hands[seat]);
@@ -982,18 +867,15 @@ function aiAct(seat){
   }
   afterAction();
 }
-
-/* 身份处理（引擎侧：单机或房主） */
 function doIdentity(seat, choice){
   if (!G || G.phase!=='identity') return;
-  if (seat !== G.holderSeat) return;  // 仅方块3+方块A持有者可选身份
+  if (seat !== G.holderSeat) return;
   G.role = choice;
   G.phase = 'play';
   G.turn = G.c4Holder;
   var nm = seatName(G,seat);
   if (choice==='landlord') feed(nm+' 叫地主！以一敌三！');
-else if (choice==='fold') feed(nm+' 弃牌认输');
-// hidden：什么都不提示，否则等于公开双牌持有者，保密玩法就失效了
+  else if (choice==='fold') feed(nm+' 弃牌认输');
   if (choice==='fold'){
     G.finishOrder=[seat];
     settle(G);
@@ -1004,18 +886,14 @@ else if (choice==='fold') feed(nm+' 弃牌认输');
   renderAll();
   scheduleAI();
 }
-
 function askIdentityIfNeeded(){
   if (!G) return;
-  // LAN 非房主：本地发牌是随机的，不能作为身份判断依据，
-  // 一切等房主 pub 同步 holderSeat/phase 后由 applyPublic 处理
   if (mode==='lan' && !isHost) return;
-
   if (!G.isSolo){
     G.role = 'team';
     G.phase = 'play';
     G.turn = G.c4Holder;
-    if (mode==='lan' && isHost) broadcastPub();   // 房主 2v2 也要广播
+    if (mode==='lan' && isHost) broadcastPub();
     renderAll();
     scheduleAI();
     return;
@@ -1028,26 +906,20 @@ function askIdentityIfNeeded(){
   } else if (h===mySeat){
     modalShown=true; $('modal-identity').classList.remove('hidden');
   } else {
-if (mode==='lan' && isHost) broadcastPub();
+    if (mode==='lan' && isHost) broadcastPub();
     renderAll();
   }
 }
-
-
 function beginHand(players, handNo){
   var carry = (G && G.phase==='handEnd') ? G.scores : null;
   G = newGameState(players, handNo||1, carry);
   selectedIds={}; selectedCount=0; modalShown=false;
-  
   $('modal-identity').classList.add('hidden');
   $('modal-result').classList.add('hidden');
-  // LAN 非房主：本地发牌是随机的，不能据此渲染；
-  // 等房主的 hand + pub 到达后再渲染（applyPublic 末尾会 renderAll）
   if (mode==='lan' && !isHost) return;
   renderAll();
   askIdentityIfNeeded();
 }
-
 function onHandEnd(){
   if (!G || G.phase!=='handEnd') return;
   if (aiTimer) clearInterval(aiTimer);
@@ -1055,7 +927,6 @@ function onHandEnd(){
   showResult();
   if (mode==='lan' && isHost) broadcastPub();
 }
-
 function showResult(){
   if (!G) return;
   $('result-title').textContent = '第 '+G.handNo+' 局结束';
@@ -1073,29 +944,20 @@ function showResult(){
   $('result-scores').innerHTML = sh;
   $('modal-result').classList.remove('hidden');
 }
-
 function nextHand(){
   $('modal-result').classList.add('hidden');
   if (mode==='lan' && !isHost){ send({kind:'next'}); return; }
   beginHand(G.players, G.handNo+1);
   if (mode==='lan' && isHost) {
     broadcastStart();
-    broadcastPub();   // 同步 phase / holderSeat / d3Seat / daSeat 等公共状态
+    broadcastPub();
   }
 }
 
-
-/* ===================================================================
-   局域网联机
-   协议：POST /api/join → {id, hostUid, players}
-         GET /api/events?id= → SSE 推送 {t, ...}
-         POST /api/send {from, to, msg}（to='host'/'all'/uid）
-   =================================================================== */
+/* ---------------- 局域网联机 ---------------- */
 var es = null;
-
 function send(msg){
   if (!myUid) return;
-  // 标准化字段名，确保服务器转发后客户端 handleMsg 能识别
   if (msg.kind && !msg.t) msg.t = msg.kind;
   var xhr = new XMLHttpRequest();
   xhr.open('POST', WS_SERVER + '/api/send', true);
@@ -1105,7 +967,6 @@ function send(msg){
   };
   xhr.send(JSON.stringify({from:myUid, to: msg.to||'host', msg:msg}));
 }
-
 function startLAN(){
   mode='lan';
   var name = ($('lobby-name').value||'').trim() || ('玩家'+(1+Math.floor(Math.random()*9)));
@@ -1133,7 +994,6 @@ function startLAN(){
   };
   xhr.send(JSON.stringify({name:name}));
 }
-
 function connectSSE(id){
   if (es) es.close();
   es = new EventSource(WS_SERVER + '/api/events?id=' + encodeURIComponent(id));
@@ -1144,7 +1004,6 @@ function connectSSE(id){
   };
   es.onerror = function(){ /* 自动重连 */ };
 }
-
 function renderLobby(players, hostUid){
   var el = $('player-list');
   var on = players.filter(function(p){ return p.online; }).length;
@@ -1164,7 +1023,6 @@ function renderLobby(players, hostUid){
     $('lobby-info').innerHTML = '已加入 '+WS_SERVER+' 房间，等待房主开始游戏…';
   }
 }
-
 function hostStart(){
   if (!G && roomPlayersReady()) {
     var online = getOnlinePlayers();
@@ -1175,19 +1033,16 @@ function hostStart(){
     $('screen-game').classList.remove('hidden');
     beginHand(players, 1);
     broadcastStart();
-broadcastPub();   // 新增：同步公共状态（含 holderSeat），让真正的持有者弹窗
+    broadcastPub();
   }
 }
-
 var lobbyPlayers = [];
 function getOnlinePlayers(){
   return lobbyPlayers.filter(function(p){ return p.online; });
 }
 function roomPlayersReady(){ return true; }
-
 function composePlayers(online){
   var players=[];
-  // 房主座位 0
   var me = null;
   for (var i=0;i<online.length;i++) if (online[i].id===myUid){ me = online[i]; break; }
   if (me) players.push({uid:me.id, name:me.name, isAI:false});
@@ -1197,11 +1052,8 @@ function composePlayers(online){
   }
   return players.slice(0,4);
 }
-
 function broadcastStart(){
-  // 向所有端发送 start（含座位定义）
   send({to:'all', kind:'start', players:G.players.map(function(p){return {uid:p.uid, name:p.name, isAI:p.isAI};}), handNo:G.handNo});
-  // 再私发每人的手牌
   G.players.forEach(function(p, seat){
     if (p.uid && !p.isAI && p.uid!==myUid){
       send({to:p.uid, kind:'hand', seat:seat, cards:G.hands[seat].map(function(c){return c.id;})});
@@ -1210,7 +1062,6 @@ function broadcastStart(){
     }
   });
 }
-
 function publicState(){
   if (!G) return null;
   return {
@@ -1226,10 +1077,8 @@ function publicState(){
     players: G.players.map(function(p){ return {uid:p.uid,name:p.name,isAI:p.isAI}; })
   };
 }
-
 function broadcastPub(){
   if (!G) return;
-  // 每个真人都私发自己的完整手牌 + 公共状态发所有人
   var st = publicState();
   G.players.forEach(function(p, seat){
     if (p.uid && !p.isAI && p.uid!==myUid){
@@ -1238,8 +1087,6 @@ function broadcastPub(){
   });
   if (st) send({to:'all', kind:'pub', state:st});
 }
-
-/* 客户端消息分发（服务器转发的 msg） */
 function handleMsg(m){
   if (m.t==='players'){
     lobbyPlayers = m.players;
@@ -1248,12 +1095,9 @@ function handleMsg(m){
     else if (G){ for (var i=0;i<G.players.length;i++) renderSeat(i); }
   }
   else if (m.t==='start'){
-    // 若服务器把 to:'all' 回环给房主本人，忽略，避免房主被自己的广播重置
     if (m.from === myUid) return;
     var players = m.players;
     mySeat = -1;
-
-  
     for (var i=0;i<players.length;i++) if (players[i].uid===myUid){ mySeat=i; break; }
     if (mySeat<0) mySeat = 0;
     var pl = players.map(function(p){ return {uid:p.uid, name:p.name, isAI:p.isAI}; });
@@ -1297,26 +1141,21 @@ function handleMsg(m){
     }
   }
   else if (m.t==='kick'){
-    // 房主广播：本局结束（房主离开）或其它
     if (es) es.close();
     $('screen-game').classList.add('hidden');
     $('screen-lobby').classList.remove('hidden');
     $('lobby-info').textContent = (m.text||'房间已解散')+' 刷新页面可重新加入。';
   }
   else if (m.t==='act'){
-    // 房主收到玩家操作
     if (isHost && G) handleClientAction(m.from, m.msg);
   }
 }
-
 function roomHost(){ return myUid || null; }
-
 function handleClientAction(from, msg){
   if (!G) return;
   if (msg.kind==='identity'){
     if (G.phase==='identity' && G.holderSeat>=0 && G.players[G.holderSeat] && G.players[G.holderSeat].uid===from){
       doIdentity(G.holderSeat, msg.choice);
-      
     }
   }
   else if (msg.kind==='play'){
@@ -1326,7 +1165,6 @@ function handleClientAction(from, msg){
       if (!res.ok){ feed('拒绝 '+seatName(G,msg.seat)+' 的出牌：'+res.msg); return; }
       feed(seatName(G,msg.seat)+'：'+TYPE_CN[analyze(cards).type]+' '+cards.map(function(c){return SUIT_CN[c.s]+c.r;}).join(' '));
       afterAction();
-      
     }
   }
   else if (msg.kind==='pass'){
@@ -1334,7 +1172,6 @@ function handleClientAction(from, msg){
       applyPass(G, msg.seat);
       feed(seatName(G,msg.seat)+'：过牌');
       afterAction();
-     
     }
   }
   else if (msg.kind==='next'){
@@ -1345,7 +1182,6 @@ function handleClientAction(from, msg){
     }
   }
 }
-
 function applyPublic(st){
   if (!G) return;
   var oldCP = G.currentPlay ? {seat:G.currentPlay.seat, ids:G.currentPlay.cards.map(function(c){return c.id;}).join(',')} : null;
@@ -1353,25 +1189,23 @@ function applyPublic(st){
   var oldTurn = G.turn;
   G.phase = st.phase;
   G.turn = st.turn;
- if (st.currentPlay){
-  var pcards = st.currentPlay.cards.map(function(id){ return mk(id[0], id.slice(1)); });
-  var pplay = analyze(clone(pcards));
-  if (!pplay){
-    // 远端传来的牌型不合法，丢弃，避免 play:null 导致 canBeat 放行任意牌
-    G.currentPlay = null;
-  } else {
-    var newIds = pcards.map(function(c){return c.id;}).join(',');
-    var isNew = !oldCP || oldCP.ids !== newIds;
-    G.currentPlay = {seat:st.currentPlay.seat, cards:pcards, play:pplay};
-    if (isNew && st.currentPlay.seat !== mySeat){
-      feed(seatName(G, st.currentPlay.seat)+'：'+TYPE_CN[pplay.type]+' '+pcards.map(function(c){return SUIT_CN[c.s]+c.r;}).join(' '));
+  if (st.currentPlay){
+    var pcards = st.currentPlay.cards.map(function(id){ return mk(id[0], id.slice(1)); });
+    var pplay = analyze(clone(pcards));
+    if (!pplay){
+      G.currentPlay = null;
+    } else {
+      var newIds = pcards.map(function(c){return c.id;}).join(',');
+      var isNew = !oldCP || oldCP.ids !== newIds;
+      G.currentPlay = {seat:st.currentPlay.seat, cards:pcards, play:pplay};
+      if (isNew && st.currentPlay.seat !== mySeat){
+        feed(seatName(G, st.currentPlay.seat)+'：'+TYPE_CN[pplay.type]+' '+pcards.map(function(c){return SUIT_CN[c.s]+c.r;}).join(' '));
+      }
     }
+  } else {
+    G.currentPlay = null;
   }
-} else {
-  G.currentPlay = null;
-}
   G.passCount = st.passCount;
-  // 过牌检测：passCount 增加且 turn 变化 → 旧 turn 的人过了牌
   if (st.passCount > oldPassCount && oldTurn !== undefined && oldTurn !== st.turn){
     if (oldTurn !== mySeat) feed(seatName(G, oldTurn)+'：过牌');
   }
@@ -1384,7 +1218,6 @@ function applyPublic(st){
   G.firstLeadDone = st.firstLeadDone;
   G.d3Seat = st.d3Seat; G.daSeat = st.daSeat; G.holderSeat = st.holderSeat;
   G.role = st.role; G.isSolo = st.isSolo; G.c4Holder = st.c4Holder; G.handNo = st.handNo;
-  // 同步张数（保持自己的手牌本地删减为准）
   for (var i=0;i<4;i++){
     if (i!==mySeat){
       var target = st.handsCount[i];
@@ -1396,10 +1229,7 @@ function applyPublic(st){
     }
   }
   if (!G.players || st.players){ G.players = st.players.map(function(p){ return {uid:p.uid,name:p.name,isAI:p.isAI}; }); }
-    if (G.phase==='identity'){
-    // 远端：若持牌者是我则弹窗（isHost 端已在 askIdentityIfNeeded 处理）
-    // ★ 关键修复：用弹窗 DOM 的可见性来判断，而不是 modalShown 变量，
-    //   避免 modalShown 在多条流程（beginHand / opt-* onclick / applyPublic）里被时序卡成 true 后永远弹不出来
+  if (G.phase==='identity'){
     if (!isHost && G.holderSeat===mySeat && $('modal-identity').classList.contains('hidden')){
       modalShown = true;
       $('modal-identity').classList.remove('hidden');
@@ -1409,8 +1239,6 @@ function applyPublic(st){
   if (G.phase==='handEnd'){ onHandEnd(); return; }
   renderAll();
 }
-
-
 
 /* ---------------- 初始化 ---------------- */
 function initUI(){
@@ -1465,7 +1293,6 @@ function initUI(){
     else doIdentity(mySeat,'fold');
   };
 
-  // 显式 ?solo / ?lan 参数可覆盖自动检测（单机模式可在任意入口强制使用）
   var qs = location.search || '';
   var forceSolo = /[?&]solo\b/.test(qs);
   var forceLan  = /[?&]lan\b/.test(qs);
@@ -1482,9 +1309,7 @@ function initUI(){
 
 initUI();
 
-/* ===================================================================
-   自测：?selftest=局数 → 运行 N 局 AI 对局并把统计写入 #testlog
-   =================================================================== */
+/* ---------------- 自测 ---------------- */
 (function(){
   var m = location.search.match(/selftest=(\d+)/);
   if (!m) return;
@@ -1546,16 +1371,13 @@ initUI();
     out.push('2v2 结果统计:');
     Object.keys(stat.teamText).forEach(function(k){ out.push('  '+k+' × '+stat.teamText[k]); });
     out.push('错误: '+(stat.errors.length?stat.errors.join('; '):'无'));
-    // 总分守恒检查
-    var total=0; stat.total=0;
-    // （每局计分独立，不跨局累计到 stat，略）
   } catch(e){
     out.push('自测异常: '+e.message+'\n'+(e.stack||''));
   }
   tg.textContent = out.join('\n');
 })();
 
-/* 调试钩子：让座位 seat 用 AI 策略自动行动（供浏览器自动化测试） */
+/* ---------------- 调试钩子 ---------------- */
 window.__debugAct = function(seat){
   if (!G || G.phase!=='play' || G.turn!==seat || G.finished[seat]) return false;
   var hand = clone(G.hands[seat]);
@@ -1585,7 +1407,6 @@ window.__debugIdentity = function(seat, choice){
   doIdentity(seat, choice);
   return true;
 };
-/* 构造最小状态直接调用 settle，返回每局增量与结果文本（供计分验证） */
 window.__debugSettle = function(role, finishOrder, holderSeat, d3Seat, daSeat){
   var g2 = {
     players: G ? G.players.map(function(p){return {name:p.name};})
