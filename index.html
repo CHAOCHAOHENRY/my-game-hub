@@ -2,9 +2,21 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>广东斗地主</title>
+<!-- 删除了 viewport-fit=cover，让系统自动避开物理挖孔 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>新会寻鸡笼</title>
+
 <style>
+/* ============ 尺寸变量（桌面默认值） ============ */
+:root{
+  --hand-w:100px;    /* 自己手牌宽度 */
+  --opp-w:58px;      /* 对手牌宽度 */
+  --trick-w:165px;   /* 出牌区牌宽度 */
+  --myzone-h:200px;  /* 底部手牌区高度 */
+}
+
 * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
 html,body { width:100%; height:100%; overflow:hidden; font-family:"Microsoft YaHei","SimHei","PingFang SC",sans-serif; }
 body { background:#1f6f4a; color:#fff; }
@@ -13,11 +25,30 @@ button { font-family:inherit; cursor:pointer; }
 .hidden { display:none !important; }
 input, button { outline:none; }
 
+/* 优化1：加入平滑淡入和硬件加速动画 */
+@keyframes fadeIn {
+  from { opacity: 0.3; transform: scale(0.98) translateZ(0); }
+  to { opacity: 1; transform: scale(1) translateZ(0); }
+}
+.card-anim {
+  animation: fadeIn 0.15s ease-out forwards;
+  backface-visibility: hidden;
+}
+
 /* ================= 大厅 ================= */
 #screen-lobby { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:100; overflow:auto; }
 #screen-lobby .panel { background:rgba(16,52,36,0.95); border:3px solid #f7e9b0; border-radius:18px; padding:24px 30px; width:460px; max-width:94%; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.5); margin:20px 0; }
 #screen-lobby h1 { font-size:37px; color:#ffe98a; letter-spacing:4px; text-shadow:2px 2px 0 #7a4d00; }
 #screen-lobby .sub { color:#cfe8d0; font-size:13px; margin:6px 0 16px; line-height:1.6; }
+#screen-lobby .maker{          
+  color:#ffe98a;
+  font-size:13.5px;
+  letter-spacing:2px;
+  margin:-4px 0 12px;
+  opacity:0.85;
+}                 
+
+
 #screen-lobby label { display:block; text-align:left; color:#ffe98a; font-size:14px; margin-bottom:4px; }
 #lobby-name { width:100%; padding:10px; font-size:17px; border-radius:8px; border:2px solid #b98a2e; margin-bottom:12px; background:#fff; color:#333; }
 #lobby-name:focus { border-color:#ffe98a; }
@@ -34,14 +65,28 @@ input, button { outline:none; }
 
 /* ================= 牌桌 ================= */
 #screen-game { position:absolute; inset:0; }
-#topbar { position:absolute; top:0; left:0; right:0; height:44px; background:rgba(0,0,0,0.5); border-bottom:2px solid #f7e9b0; display:flex; align-items:center; padding:0 10px; font-size:13px; z-index:30; }
+
+/* 恢复正常尺寸，系统会自动避开黑洞 */
+#topbar { 
+  position:absolute; 
+  top:0; left:0; right:0; 
+  height:44px; 
+  background:rgba(0,0,0,0.5); 
+  border-bottom:2px solid #f7e9b0; 
+  display:flex; 
+  align-items:center; 
+  padding:0 10px; 
+  font-size:13px; 
+  z-index:30; 
+}
+
 #topbar .title { color:#ffe98a; font-weight:bold; font-size:16px; margin-right:6px; }
 #topbar .score-chip { margin-left:5px; padding:2px 8px; border-radius:14px; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.3); white-space:nowrap; }
 #topbar .score-chip b { color:#ffe98a; }
 #topbar .handno { margin-left:auto; color:#cfe8d0; }
 #btn-quit { margin-left:8px; background:#b34d4d; color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:12px; }
 
-#table { position:absolute; top:44px; bottom:200px; left:0; right:0; }
+#table { position:absolute; top:44px; bottom:var(--myzone-h, 200px); left:0; right:0; }
 
 .seat { position:absolute; z-index:10; text-align:center; }
 #seat-0 { bottom:6px; left:50%; transform:translateX(-50%); }
@@ -53,8 +98,14 @@ input, button { outline:none; }
 .seat .nameplate .cnt { color:#ffd75e; font-size:12px; margin-left:6px; }
 .seat .tagline { font-size:11px; color:#9fe3ff; margin-top:1px; margin-bottom:4px; min-height:14px; position:relative; z-index:2; }
 .seat .opp-hand { margin-top:2px; }
-/* 优化：对手牌也固定高度 */
-.seat .opp-hand img { width:58px; height:81px; object-fit:contain; margin:0 -24px 0 0; }
+
+.seat .opp-hand img {
+  width:var(--opp-w, 58px);
+  height:calc(var(--opp-w, 58px) * 1.4);
+  object-fit:contain;
+  margin:0 calc(var(--opp-w, 58px) * -0.414) 0 0;
+}
+
 .seat .finish-note { color:#7ef08a; font-size:12px; }
 
 #trick-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); min-width:330px; z-index:15; text-align:center; }
@@ -63,22 +114,27 @@ input, button { outline:none; }
   background:rgba(0,0,0,0.62); border:1px solid rgba(247,233,176,0.4); border-radius:8px;
   padding:3px 10px; margin-bottom:4px; font-size:13px; color:#ffe98a; white-space:nowrap; }
 
-/* 优化：出牌区固定高度 */
-.trick-cards { display:flex; justify-content:center; align-items:center; min-height:231px; }
-.trick-cards img { width:165px; height:231px; object-fit:contain; }
-.trick-cards img:not(:last-child) { margin-right:-52px; }
+.trick-cards { display:flex; justify-content:center; align-items:center; min-height:calc(var(--trick-w, 165px) * 1.4); }
+.trick-cards img { width:var(--trick-w, 165px); height:calc(var(--trick-w, 165px) * 1.4); object-fit:contain; will-change: transform; }
+.trick-cards img:not(:last-child) { margin-right:calc(var(--trick-w, 165px) * -0.315); }
 .trick-cards .empty { color:#bcd8c0; font-size:15px; }
-@media (max-height:640px) { .trick-cards { min-height:189px; } .trick-cards img { width:135px; height:189px; } }
-@media (max-height:560px) { .trick-cards { min-height:161px; } .trick-cards img { width:115px; height:161px; } }
-@media (max-height:520px) { .trick-cards { min-height:140px; } .trick-cards img { width:100px; height:140px; } }
 
 #statusline { position:absolute; top:48px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.6); padding:5px 18px; border-radius:20px; font-size:14px; z-index:20; white-space:nowrap; max-width:92%; }
 
-#myzone { position:absolute; bottom:0; left:0; right:0; height:200px; background:linear-gradient(rgba(0,0,0,0.2),rgba(0,0,0,0.6)); border-top:2px solid #f7e9b0; z-index:25; }
+#myzone { position:absolute; bottom:0; left:0; right:0; height:var(--myzone-h, 200px); background:#1b5c3d; border-top:2px solid #f7e9b0; z-index:25; }
+
 #my-hand { position:absolute; top:6px; left:50%; transform:translateX(-50%); display:flex; justify-content:center; }
-/* 优化：自己手牌固定高度 */
-#my-hand img { width:100px; height:140px; object-fit:contain; margin:0 -28px; cursor:pointer; transition:transform 0.12s; }
-#my-hand img.sel { transform:translateY(-22px); }
+#my-hand img {
+  width:var(--hand-w, 100px);
+  height:calc(var(--hand-w, 100px) * 1.4);
+  object-fit:contain;
+  margin:0; 
+  cursor:pointer;
+  transition:transform 0.12s;
+  will-change: transform;
+}
+#my-hand img.sel { transform:translateY(calc(var(--hand-w, 100px) * -0.22)); }
+
 #my-ctrl { position:absolute; bottom:8px; left:0; right:0; text-align:center; }
 #my-ctrl button { font-size:17px; font-weight:bold; padding:8px 24px; border-radius:10px; border:none; margin:0 8px; }
 #btn-play { background:linear-gradient(#8ef09a,#3fbf66); color:#0b4d1e; box-shadow:0 3px 0 #2a8a44; }
@@ -111,6 +167,34 @@ input, button { outline:none; }
 .landlord-badge { display:inline-block; background:linear-gradient(#ffd75e,#e8a33d); color:#5c3a00; font-weight:bold; font-size:14px; padding:2px 10px; border-radius:6px; box-shadow:0 2px 0 #a86f1b; letter-spacing:2px; }
 
 #testlog { position:fixed; bottom:0; right:0; width:55%; max-height:42%; overflow:auto; background:#0a0f0a; color:#7df07d; font:11px Consolas,monospace; z-index:999; white-space:pre-wrap; padding:6px; }
+
+/* ============ 手机 / 小屏自适应 ============ */
+@media (max-width:760px){
+  :root{
+    --hand-w:15vw;
+    --opp-w:8vw;
+    --trick-w:23vw;
+    --myzone-h:150px;
+  }
+  #trick-center{ min-width:0; max-width:94vw; }
+  #my-ctrl button{ font-size:15px; padding:6px 16px; margin:0 5px; }
+  .seat .nameplate{ font-size:12px; padding:2px 8px; }
+}
+
+@media (max-height:560px){
+  :root{ --myzone-h:130px; }
+}
+@media (max-width:760px) and (max-height:560px){
+  /* 横屏手机 */
+  :root{
+    --hand-w:clamp(32px, 9vh, 80px);
+    --trick-w:clamp(44px, 18vh, 110px);
+  }
+}
+@media (max-width:480px){
+  #topbar .title{ display:none; }
+  #topbar .score-chip{ padding:2px 5px; font-size:11px; margin-left:3px; }
+}
 </style>
 </head>
 <body>
@@ -118,7 +202,8 @@ input, button { outline:none; }
 <!-- =================== 大厅 =================== -->
 <div id="screen-lobby">
   <div class="panel">
-    <h1>广东斗地主</h1>
+    <h1>新会寻鸡笼</h1>
+<div class="maker">制作者：潮流之神</div>
     <div class="sub">四人锄大地 · 方块3 / 方块A 组队对抗 · 支持局域网联机与电脑补位</div>
     <label for="lobby-name">你的名字：</label>
     <input id="lobby-name" maxlength="8" placeholder="请输入名字">
@@ -132,7 +217,7 @@ input, button { outline:none; }
 <!-- =================== 牌桌 =================== -->
 <div id="screen-game" class="hidden">
   <div id="topbar">
-    <span class="title">广东斗地主</span>
+    <span class="title">新会寻鸡笼</span>
     <span id="mode-tag" style="color:#bcd8c0;font-size:12px"></span>
     <span class="score-chip" id="chip-0"></span>
     <span class="score-chip" id="chip-1"></span>
@@ -188,12 +273,12 @@ input, button { outline:none; }
 
 <script>
 /* ===================================================================
-   广东斗地主（四人锄大地变体）
+   新会寻鸡笼（四人锄大地变体）
    =================================================================== */
 (function(){
 "use strict";
 
-/* ---------------- 优化：预加载所有图片 ---------------- */
+// 优化2：确保图片被真正缓存
 function preloadAllCards() {
     var suits = ['c','h','s','d'];
     var ranks = ['4','5','6','7','8','9','10','J','Q','K','A','2','3'];
@@ -206,17 +291,23 @@ function preloadAllCards() {
     var back = new Image();
     back.src = 'cards/back1.png';
 }
-preloadAllCards(); // 网页一打开立刻执行预加载
+preloadAllCards(); 
 
-/* ---------------- 常量 ---------------- */
-var SUIT_ORDER = ['c','h','s','d'];                 // 梅花<红桃<黑桃<方块
+var SUIT_ORDER = ['c','h','s','d'];
 var SUIT_CN   = {c:'梅花', h:'红桃', s:'黑桃', d:'方块'};
-var RANK_ORDER = ['4','5','6','7','8','9','10','J','Q','K','A','2','3']; // 小→大
+var RANK_ORDER = ['4','5','6','7','8','9','10','J','Q','K','A','2','3'];
 var RANK_VAL = {}; RANK_ORDER.forEach(function(r,i){ RANK_VAL[r]=i; });
 var SUIT_VAL = {c:0, h:1, s:2, d:3};
 var TYPE_CN = {single:'单张', pair:'对子', triple:'三条', straight:'顺子', flush:'同花', full:'葫芦', bomb:'金刚', sf:'同花顺'};
 var IMG_BACK = 'cards/back1.png';
-var AI_NAMES = ['瑞珍','艳芬','宝红'];
+var ALL_AI_NAMES = ['瑞珍', '艳芬', '宝红', '阿国', '小银', '元培', '阿雪', '春燕', '炜炘', '晓晴', '靖仪', '蕾竹', '芷茵', '保镜', '健球', '添哥'];
+
+function getRandomAINames(count) {
+    var pool = ALL_AI_NAMES.slice();
+    pool.sort(function() { return 0.5 - Math.random(); }); 
+    return pool.slice(0, count);
+}
+
 var MAX_TURNS = 400;
 
 function strength(card){ return RANK_VAL[card.r]*4 + SUIT_VAL[card.s]; }
@@ -231,20 +322,12 @@ function clone(cards){ return cards.map(function(c){ return {s:c.s, r:c.r, id:c.
 function fmt(v){ return (v>0?'+':'')+v; }
 function pad(n){ return n<10 ? '0'+n : ''+n; }
 
-/* ---------------- 牌型识别 ---------------- */
 var STRAIGHT_TABLE = (function(){
   var tops = ['5','6','7','8','9','10','J','Q','K','A'];
   var sets = [
-    ['A','2','3','4','5'],
-    ['2','3','4','5','6'],
-    ['3','4','5','6','7'],
-    ['4','5','6','7','8'],
-    ['5','6','7','8','9'],
-    ['6','7','8','9','10'],
-    ['7','8','9','10','J'],
-    ['8','9','10','J','Q'],
-    ['9','10','J','Q','K'],
-    ['10','J','Q','K','A']
+    ['A','2','3','4','5'],['2','3','4','5','6'],['3','4','5','6','7'],['4','5','6','7','8'],
+    ['5','6','7','8','9'],['6','7','8','9','10'],['7','8','9','10','J'],['8','9','10','J','Q'],
+    ['9','10','J','Q','K'],['10','J','Q','K','A']
   ];
   return tops.map(function(top, i){
     var vals = sets[i].map(function(r){ return RANK_VAL[r]; }).sort(function(a,b){ return a-b; });
@@ -330,7 +413,6 @@ function canBeat(p, base){
   return false;
 }
 
-/* ---------------- 牌堆 ---------------- */
 function buildDeck(){
   var deck=[];
   SUIT_ORDER.forEach(function(s){ RANK_ORDER.forEach(function(r){ deck.push(mk(s,r)); }); });
@@ -340,7 +422,6 @@ function shuffle(a){ for (var i=a.length-1;i>0;i--){ var j=Math.floor(Math.rando
 function deal(){ var d=shuffle(buildDeck()); var h=[[],[],[],[]]; d.forEach(function(c,i){ h[i%4].push(c); }); return h; }
 function holder(h,s,r){ for (var i=0;i<4;i++) if (has(h[i], s+r)) return i; return -1; }
 
-/* ---------------- AI ---------------- */
 var AI = {};
 AI.allPlays = function(hand){
   var P = [];
@@ -486,30 +567,20 @@ AI.follow = function(hand, g){
   return AI.findBeat(hand, base);
 };
 
-/* ---------------- 对局状态机 ---------------- */
 function newGameState(players, handNo, carryScores){
   var h = deal();
   var d3 = holder(h,'d','3'), da = holder(h,'d','A'), c4 = holder(h,'c','4');
   var isSolo = (d3===da);
   return {
-    handNo: handNo,
-    players: players,
-    hands: h,
+    handNo: handNo, players: players, hands: h,
     d3Seat: d3, daSeat: da, c4Holder: c4,
     isSolo: isSolo, holderSeat: isSolo ? d3 : -1,
     role: isSolo ? null : 'team',
-    phase: 'identity',
-    turn: c4,
-    trickNo: 0,
-    trickLeader: c4,
-    currentPlay: null,
-    passCount: 0,
-    finished: [false,false,false,false],
-    finishOrder: [],
-    scores: (carryScores||[0,0,0,0]).slice(),
-    lastDeltas: [0,0,0,0],
-    firstLeadDone: false,
-    resultText: '',
+    phase: 'identity', turn: c4,
+    trickNo: 0, trickLeader: c4, currentPlay: null, passCount: 0,
+    finished: [false,false,false,false], finishOrder: [],
+    scores: (carryScores||[0,0,0,0]).slice(), lastDeltas: [0,0,0,0],
+    firstLeadDone: false, resultText: '',
     seatUids: players.map(function(p){ return p.uid || null; })
   };
 }
@@ -635,7 +706,6 @@ function nextTurn(g){
   return nx;
 }
 
-/* ---------------- 全局状态 ---------------- */
 var G = null;
 var mySeat = 0;
 var myUid = null;
@@ -658,7 +728,6 @@ function feed(msg){
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-/* ---------------- 渲染 ---------------- */
 function renderTop(){
   if (!G) return;
   for (var i=0;i<4;i++){
@@ -714,13 +783,16 @@ function renderSeat(seat){
   if (tagHtml) html += '<div class="tagline">'+tagHtml+'</div>';
   if (!isMe){
     html += '<div class="opp-hand">';
-    var n = Math.min(cnt, 8);
+    var n = Math.min(cnt, window.innerWidth < 640 ? 5 : 8);
     for (var i=0;i<n;i++) html += '<img src="'+IMG_BACK+'">';
     html += '</div>';
   }
   box.innerHTML = html;
   box.className = 'seat' + (G.turn===seat && G.phase==='play' && !G.finished[seat] ? ' turn' : '') + (fin ? ' finish' : '');
 }
+
+// 优化3：缓存上一次渲染的牌，防止重复渲染
+var lastTrickStr = "";
 function renderTrick(){
   if (!G) return;
   var el = $('trick-center');
@@ -732,27 +804,71 @@ function renderTrick(){
   var lines = '';
   if (title) lines += '<div class="line">'+title+'</div>';
   var ch = '';
+  
   if (G.currentPlay){
     var p = G.currentPlay;
     lines += '<div class="line">'+esc(seatName(G,p.seat))+' 出 '+TYPE_CN[p.play.type]+'</div>';
-    ch += '<div class="trick-cards">';
-    p.cards.forEach(function(c){ ch += '<img src="'+img(c.id)+'">'; });
-    ch += '</div>';
+    
+    // 生成当前牌的指纹
+    var trickStr = p.cards.map(function(c){return c.id;}).join(',');
+    // 如果牌没变，就不去动 DOM，防止闪烁
+    if (trickStr !== lastTrickStr) {
+      ch += '<div class="trick-cards">';
+      p.cards.forEach(function(c){ ch += '<img src="'+img(c.id)+'" class="card-anim">'; });
+      ch += '</div>';
+      el.innerHTML = ch;
+      lastTrickStr = trickStr;
+    } else {
+      // 仅更新状态文字
+      stat.innerHTML = lines;
+      return;
+    }
   } else {
-    ch = '<div class="trick-cards"><span class="empty">新一轮，等待领出…</span></div>';
+    if (lastTrickStr !== 'empty') {
+      ch = '<div class="trick-cards"><span class="empty">新一轮，等待领出…</span></div>';
+      el.innerHTML = ch;
+      lastTrickStr = 'empty';
+    }
   }
   stat.innerHTML = lines;
-  el.innerHTML = ch;
 }
+
 function renderMyHand(){
   if (!G) return;
   var html='';
   var sorted = desc(G.hands[mySeat]||[]);
-  for (var i=0;i<sorted.length;i++){
+  var n = sorted.length;
+  
+  var screenW = window.innerWidth || document.documentElement.clientWidth;
+  var isMobile = screenW <= 760;
+  var cardW = isMobile ? (screenW * 0.16) : 100;
+  var maxHandW = isMobile ? (screenW - 20) : Math.min(screenW * 0.55, 750);
+  var overlap = 0; 
+  
+  if (n > 1) {
+    var totalW = n * cardW; 
+    if (totalW > maxHandW) {
+      var showW = (maxHandW - cardW) / (n - 1);
+      if (showW < cardW * 0.25) showW = cardW * 0.25;
+      overlap = showW - cardW;
+    } else {
+      overlap = 2;
+    }
+  }
+
+  document.documentElement.style.setProperty('--hand-w', cardW + 'px');
+  if (isMobile) {
+    document.documentElement.style.setProperty('--myzone-h', (cardW * 1.4 + 75) + 'px');
+  }
+
+  for (var i=0;i<n;i++){
     var c = sorted[i];
-    html += '<img src="'+img(c.id)+'" data-id="'+c.id+'"'+(selectedIds[c.id]?' class="sel"':'')+'>';
+    var style = '';
+    if (i > 0) style = ' style="margin-left:' + overlap + 'px"';
+    html += '<img src="'+img(c.id)+'" data-id="'+c.id+'"'+(selectedIds[c.id]?' class="sel"':'')+style+'>';
   }
   $('my-hand').innerHTML = html;
+  
   var imgs = $('my-hand').querySelectorAll('img');
   for (var j=0;j<imgs.length;j++){
     (function(im){
@@ -765,6 +881,7 @@ function renderMyHand(){
     })(imgs[j]);
   }
 }
+
 function renderCtrl(){
   if (!G){ $('ctrl-note').textContent=''; return; }
   var myTurn = (G.phase==='play' && G.turn===mySeat && !G.finished[mySeat]);
@@ -787,7 +904,6 @@ function renderAll(){
   renderCtrl();
 }
 
-/* ---------------- 人类操作 ---------------- */
 function myCards(){
   var ids = Object.keys(selectedIds);
   return ids.map(function(id){ return mk(id[0], id.slice(1)); });
@@ -847,7 +963,6 @@ function scheduleAI(){
     var s = G.turn;
     if (!(G.players[s] && G.players[s].isAI)){ clearInterval(aiTimer); return; }
     clearInterval(aiTimer);
-    // 优化：把 650 改为 350，加快电脑出牌速度
     setTimeout(function(){ aiAct(s); }, 350);
   }, 150);
 }
@@ -914,6 +1029,7 @@ function beginHand(players, handNo){
   var carry = (G && G.phase==='handEnd') ? G.scores : null;
   G = newGameState(players, handNo||1, carry);
   selectedIds={}; selectedCount=0; modalShown=false;
+  lastTrickStr = ""; // 重置出牌缓存
   $('modal-identity').classList.add('hidden');
   $('modal-result').classList.add('hidden');
   if (mode==='lan' && !isHost) return;
@@ -954,7 +1070,6 @@ function nextHand(){
   }
 }
 
-/* ---------------- 局域网联机 ---------------- */
 var es = null;
 function send(msg){
   if (!myUid) return;
@@ -1002,7 +1117,7 @@ function connectSSE(id){
     try { m = JSON.parse(ev.data); } catch(e){ return; }
     handleMsg(m);
   };
-  es.onerror = function(){ /* 自动重连 */ };
+  es.onerror = function(){ };
 }
 function renderLobby(players, hostUid){
   var el = $('player-list');
@@ -1047,8 +1162,10 @@ function composePlayers(online){
   for (var i=0;i<online.length;i++) if (online[i].id===myUid){ me = online[i]; break; }
   if (me) players.push({uid:me.id, name:me.name, isAI:false});
   online.forEach(function(p){ if (p.id!==myUid) players.push({uid:p.id, name:p.name, isAI:false}); });
-  while (players.length<4){
-    players.push({uid:'ai'+players.length, name:AI_NAMES[players.length-1], isAI:true});
+  var needAI = 4 - players.length;
+  var randomNames = getRandomAINames(needAI);
+  for (var i = 0; i < needAI; i++) {
+    players.push({uid:'ai'+players.length, name:randomNames[i], isAI:true});
   }
   return players.slice(0,4);
 }
@@ -1058,7 +1175,6 @@ function broadcastStart(){
     if (p.uid && !p.isAI && p.uid!==myUid){
       send({to:p.uid, kind:'hand', seat:seat, cards:G.hands[seat].map(function(c){return c.id;})});
     } else if (p.uid && !p.isAI && p.uid===myUid){
-      // 当地已有手牌
     }
   });
 }
@@ -1240,23 +1356,27 @@ function applyPublic(st){
   renderAll();
 }
 
-/* ---------------- 初始化 ---------------- */
 function initUI(){
-  $('btn-start-solo').onclick = function(){
+  // 把单机模式的点击逻辑抽离出来，方便在后台断开时重新绑定
+  function startSoloModeClick() {
     var name = ($('lobby-name').value||'').trim() || ('玩家'+(1+Math.floor(Math.random()*9)));
     $('lobby-name').value = name;
     mode='solo';
+    var randomNames = getRandomAINames(3);
     var players = [
       {name:name, isAI:false, uid:'me'},
-      {name:AI_NAMES[0], isAI:true, uid:'ai0'},
-      {name:AI_NAMES[1], isAI:true, uid:'ai1'},
-      {name:AI_NAMES[2], isAI:true, uid:'ai2'}
+      {name:randomNames[0], isAI:true, uid:'ai0'},
+      {name:randomNames[1], isAI:true, uid:'ai1'},
+      {name:randomNames[2], isAI:true, uid:'ai2'}
     ];
+    
     $('screen-lobby').classList.add('hidden');
     $('screen-game').classList.remove('hidden');
     mySeat = 0;
     beginHand(players, 1);
-  };
+  }
+  $('btn-start-solo').onclick = startSoloModeClick;
+
   $('btn-play').onclick = humanPlay;
   $('btn-pass').onclick = humanPass;
   $('btn-hint').onclick = function(){
@@ -1297,19 +1417,48 @@ function initUI(){
   var forceSolo = /[?&]solo\b/.test(qs);
   var forceLan  = /[?&]lan\b/.test(qs);
 
-  if ((WS_SERVER && !forceSolo) || forceLan){
-    mode='lan';
-    $('btn-start-solo').textContent = '输入名字，加入局域网房间';
-    $('btn-start-solo').onclick = startLAN;
-    $('lobby-info').innerHTML = '已通过服务器访问 '+WS_SERVER+'。<br>输入名字后点击上方按钮加入房间，房主点击「开始游戏」即可开局（人数不足电脑自动补位）。';
+  // 重置为单机界面的辅助函数
+  function resetToSolo(tip) {
+    mode = 'solo';
+    $('btn-start-solo').disabled = false;
+    $('btn-start-solo').textContent = '单机模式（电脑补位陪玩）';
+    $('btn-start-solo').onclick = startSoloModeClick;
+    $('lobby-info').innerHTML = tip || '单机模式：输入名字，点击上方按钮开始，电脑自动补满 3 人。<br>局域网联机：在房主电脑上启动 server.py，所有玩家用浏览器访问 <b>http://房主IP:8000</b> 即可一起玩。';
+  }
+
+  if ((WS_SERVER && !forceSolo) || forceLan) {
+    // 页面一加载，先进入检测状态
+    $('btn-start-solo').disabled = true;
+    $('btn-start-solo').textContent = '正在连接联机服务器...';
+    $('lobby-info').innerHTML = '正在检测后台状态，请稍候...';
+
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 3000); // 3秒超时
+
+    // 探测后端是否存活。请求根路径或者不存在的接口，只要不抛网络错误，就说明服务器在。
+    fetch(WS_SERVER + '/?ping=' + Date.now(), { method: 'HEAD', signal: controller.signal })
+      .then(function(res) {
+        clearTimeout(timeoutId);
+        // 只要请求成功返回（不论是200、404还是501），都说明后台通了
+        mode = 'lan';
+        $('btn-start-solo').disabled = false;
+        $('btn-start-solo').textContent = '输入名字，加入局域网房间';
+        $('btn-start-solo').onclick = startLAN;
+        $('lobby-info').innerHTML = '已通过服务器访问 '+WS_SERVER+'。<br>输入名字后点击上方按钮加入房间，房主点击「开始游戏」即可开局（人数不足电脑自动补位）。';
+      })
+      .catch(function(err) {
+        clearTimeout(timeoutId);
+        // 网络超时或被拒绝，说明后台没开
+        resetToSolo('<span style="color:#ff9b9b;font-weight:bold;">⚠️ 联网服务器没有打开，现在只能单机模式。</span>');
+      });
   } else {
-    $('lobby-info').innerHTML = '单机模式：输入名字，点击上方按钮开始，电脑自动补满 3 人。<br>局域网联机：在房主电脑上启动 server.py，所有玩家用浏览器访问 <b>http://房主IP:8000</b> 即可一起玩。';
+    // 直接单机
+    resetToSolo();
   }
 }
 
 initUI();
 
-/* ---------------- 自测 ---------------- */
 (function(){
   var m = location.search.match(/selftest=(\d+)/);
   if (!m) return;
@@ -1377,7 +1526,6 @@ initUI();
   tg.textContent = out.join('\n');
 })();
 
-/* ---------------- 调试钩子 ---------------- */
 window.__debugAct = function(seat){
   if (!G || G.phase!=='play' || G.turn!==seat || G.finished[seat]) return false;
   var hand = clone(G.hands[seat]);
