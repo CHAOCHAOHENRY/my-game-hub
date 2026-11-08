@@ -2857,7 +2857,7 @@ function renderPrizePool() {
     var titles = {
         1: '🔮 星语塔罗占卜',
         2: '🌙 中国农历运程',
-        3: '🎁 神秘小程序 3',
+        3: '🌌 48星区性格测试',
         4: '🎁 神秘小程序 4',
         5: '🎁 神秘小程序 5',
         6: '🎁 神秘小程序 6',
@@ -2909,6 +2909,8 @@ function openPrize(index) {
         window.open('/prizes/tarot.html', '_blank');
     } else if (index === 2) {
         window.open('/prizes/fortune.html', '_blank');
+    } else if (index === 3) {
+        window.open(API_BASE + '/prizes/48zones.html', '_blank');
     }
 }
 
