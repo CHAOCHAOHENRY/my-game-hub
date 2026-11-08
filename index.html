@@ -32,7 +32,7 @@ input, button { outline:none; }
 .btn-prize { background:linear-gradient(#ff9b9b,#e06b6b); color:#5c1212; box-shadow:0 4px 0 #b34d4d; }
 
 #screen-auth { position:absolute; inset:0; background:#1a4a33; display:none; align-items:center; justify-content:center; z-index:200; flex-direction:column; }
-.auth-box { background:#22563b; border:3px solid #f7e9b0; border-radius:16px; padding:35px 40px; width:400px; text-align:center; }
+.auth-box { background:#22563b; border:3px solid #f7e9b0; border-radius:16px; padding:35px 40px; width:400px; max-width:92vw; max-height:92vh; overflow-y:auto; -webkit-overflow-scrolling:touch; text-align:center; }
 .auth-box h1 { color:#ffe98a; margin-bottom:20px; font-size:32px; }
 .auth-box input { width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:none; font-size:16px; }
 .auth-box button { width:100%; padding:14px; border:none; border-radius:8px; font-size:18px; font-weight:bold; cursor:pointer; margin-bottom:12px; }
@@ -557,6 +557,7 @@ function playBGM() {
 
 var preloadCount = 0;
 var totalAssets = 0;
+var loadingFinished = false;
 
 function preloadAssets() {
     var suits = ['c','h','s','d'];
@@ -569,18 +570,23 @@ function preloadAssets() {
         }
     }
     
-    var audioList = ['click','play','play2','play3','play4','pass','pass2','win','lose','bgm','bgm2','bgm3','bgm4'];
+    // BGM 不再预加载（4 首共约 16MB），首次点击时 playBGM 会按需创建
+    var audioList = ['click','play','play2','play3','play4','pass','pass2','win','lose'];
     totalAssets = imgList.length + audioList.length;
+    
+    function finishLoading() {
+        if (loadingFinished) return;
+        loadingFinished = true;
+        document.getElementById('loading-screen').classList.add('hidden');
+        startTitleAnimation();
+    }
     
     function updateProgress() {
         preloadCount++;
         var pct = Math.floor((preloadCount / totalAssets) * 100);
         document.getElementById('loading-text').textContent = '正在加载游戏资源 ' + pct + '%...';
         if (preloadCount >= totalAssets) {
-            setTimeout(() => {
-                document.getElementById('loading-screen').classList.add('hidden');
-                startTitleAnimation();
-            }, 500);
+            setTimeout(finishLoading, 500);
         }
     }
     
@@ -593,11 +599,23 @@ function preloadAssets() {
     
     audioList.forEach(name => {
         var a = new Audio('sounds/' + name + '.mp3');
-        a.addEventListener('canplaythrough', updateProgress, {once:true});
-        a.addEventListener('error', updateProgress, {once:true});
+        a.preload = 'auto';
+        var done = false;
+        var markDone = function() {
+            if (done) return;
+            done = true;
+            updateProgress();
+        };
+        // iOS Safari 经常不触发 canplaythrough，用多个事件+兜底超时避免卡加载页
+        ['loadeddata','canplay','canplaythrough'].forEach(ev => {
+            a.addEventListener(ev, markDone, {once:true});
+        });
+        a.addEventListener('error', markDone, {once:true});
         a.load();
         audioCache[name] = a; 
     });
+    
+    setTimeout(finishLoading, 6000);
 }
 
 function startTitleAnimation() {
