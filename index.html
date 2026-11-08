@@ -168,8 +168,9 @@ input, button { outline:none; }
 #landlord-dialog {
     align-items: flex-start; /* 从顶部对齐 */
     padding-top: 8vh; /* 距顶部 8% 的位置，不遮挡底部的牌 */
-    background: rgba(0,0,0,0.3); /* 黑色遮罩变淡 */
-    backdrop-filter: blur(1px); /* 轻微模糊底图，但不影响看牌 */
+    background: rgba(0,0,0,0.12); /* 只轻微压暗，保证自己的牌清晰可见 */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 #landlord-dialog .dialog-box {
     margin-top: 0;
@@ -513,6 +514,7 @@ input, button { outline:none; }
 <script>
 // ================= 🔥 核心配置区 🔥 =================
 var API_BASE = 'https://game.chaochaoddzhenry2026.dpdns.org'; // 填你刚刚弄好的后端地址
+var ASSET_VERSION = '2026-11-08-1'; // 卡牌/音效有更新时改这个版本号，重进才会重新预加载
 // ===================================================
 
 var audioCache = {};
@@ -559,6 +561,12 @@ var preloadCount = 0;
 var totalAssets = 0;
 var loadingFinished = false;
 
+function enterMenuDirect() {
+    document.getElementById('loading-screen').classList.add('hidden');
+    document.getElementById('screen-title').style.display = 'none';
+    document.getElementById('screen-menu').style.display = 'flex';
+}
+
 function preloadAssets() {
     var suits = ['c','h','s','d'];
     var ranks = ['4','5','6','7','8','9','10','J','Q','K','A','2','3'];
@@ -570,13 +578,17 @@ function preloadAssets() {
         }
     }
     
-    // BGM 不再预加载（4 首共约 16MB），首次点击时 playBGM 会按需创建
+    // 加载页只等卡牌图片；短音效后台加载，BGM 首次点击时按需创建
     var audioList = ['click','play','play2','play3','play4','pass','pass2','win','lose'];
-    totalAssets = imgList.length + audioList.length;
+    totalAssets = imgList.length;
+    var assetsReady = false;
     
     function finishLoading() {
         if (loadingFinished) return;
         loadingFinished = true;
+        if (assetsReady) {
+            try { localStorage.setItem('ddzAssetVersion', ASSET_VERSION); } catch(e) {}
+        }
         document.getElementById('loading-screen').classList.add('hidden');
         startTitleAnimation();
     }
@@ -586,7 +598,8 @@ function preloadAssets() {
         var pct = Math.floor((preloadCount / totalAssets) * 100);
         document.getElementById('loading-text').textContent = '正在加载游戏资源 ' + pct + '%...';
         if (preloadCount >= totalAssets) {
-            setTimeout(finishLoading, 500);
+            assetsReady = true;
+            setTimeout(finishLoading, 300);
         }
     }
     
@@ -594,28 +607,19 @@ function preloadAssets() {
         var img = new Image();
         img.onload = updateProgress;
         img.onerror = updateProgress;
+        img.decoding = 'async';
         img.src = src;
     });
     
     audioList.forEach(name => {
         var a = new Audio('sounds/' + name + '.mp3');
         a.preload = 'auto';
-        var done = false;
-        var markDone = function() {
-            if (done) return;
-            done = true;
-            updateProgress();
-        };
-        // iOS Safari 经常不触发 canplaythrough，用多个事件+兜底超时避免卡加载页
-        ['loadeddata','canplay','canplaythrough'].forEach(ev => {
-            a.addEventListener(ev, markDone, {once:true});
-        });
-        a.addEventListener('error', markDone, {once:true});
         a.load();
-        audioCache[name] = a; 
+        audioCache[name] = a;
     });
     
-    setTimeout(finishLoading, 6000);
+    // 极慢网络/个别图片异常时也不把用户卡在加载页
+    setTimeout(finishLoading, 8000);
 }
 
 function startTitleAnimation() {
@@ -1958,25 +1962,21 @@ function renderAllSingle(tempG) {
     stat.innerHTML = lines;
     
     var sorted = (tempG.hands[0] || []).slice().sort(function(a,b){ return strength(b.id) - strength(a.id); });
-    var hHtml = '';
-    for(var k=0; k<sorted.length; k++) {
-        var c = sorted[k];
-        hHtml += '<img src="'+img(c.id)+'" data-id="'+c.id+'" class="'+(selectedIds[c.id]?'sel':'')+'">';
-    }
-    $('my-hand').innerHTML = hHtml;
-    
-    var imgs = $('my-hand').querySelectorAll('img');
-    for(var x=0; x<imgs.length; x++) {
-        (function(im){
-            im.onclick = function() {
-                if (tempG.phase === 'ended') return;
-                playSound('click');
-                var id = im.getAttribute('data-id');
-                if(selectedIds[id]) { delete selectedIds[id]; selectedCount--; }
-                else { selectedIds[id] = true; selectedCount++; }
-                updateGameStateSolo();
-            };
-        })(imgs[x]);
+    var handSig = handSignature(sorted);
+    if (handSig !== G._lastHandSig) {
+        G._lastHandSig = handSig;
+        var hHtml = '';
+        for(var k=0; k<sorted.length; k++) {
+            var c = sorted[k];
+            hHtml += '<img src="'+img(c.id)+'" data-id="'+c.id+'" decoding="async" class="'+(selectedIds[c.id]?'sel':'')+'">';
+        }
+        $('my-hand').innerHTML = hHtml;
+    } else {
+        // 手牌没变就只切换选中态，避免重建 DOM 导致手机端整手牌闪烁
+        var imgs = $('my-hand').querySelectorAll('img');
+        for(var x=0; x<imgs.length; x++) {
+            imgs[x].classList.toggle('sel', !!selectedIds[imgs[x].getAttribute('data-id')]);
+        }
     }
     
     var hasCards = tempG.hands[0] && tempG.hands[0].length > 0;
@@ -2258,6 +2258,26 @@ function humanPass() {
     }).then(() => { selectedIds = {}; selectedCount = 0; lastGameStr = ""; });
 }
 
+function handSignature(cards) {
+    return cards.map(function(c){ return c.id || c; }).join(',');
+}
+
+function toggleCardSelection(im) {
+    if (!im || im.tagName !== 'IMG') return;
+    playSound('click');
+    var id = im.getAttribute('data-id');
+    if (!id) return;
+    if (selectedIds[id]) {
+        delete selectedIds[id];
+        selectedCount--;
+        im.classList.remove('sel');
+    } else {
+        selectedIds[id] = true;
+        selectedCount++;
+        im.classList.add('sel');
+    }
+}
+
 function renderAll() {
     // 联机模式渲染
     for(var i=0; i<4; i++) { 
@@ -2314,25 +2334,21 @@ function renderAll() {
     stat.innerHTML = lines;
     
     var sorted = (G.hands[mySeat] || []).slice().sort(function(a,b){ return strength(b.id) - strength(a.id); });
-    var hHtml = '';
-    for(var k=0; k<sorted.length; k++) {
-        var c = sorted[k];
-        hHtml += '<img src="'+img(c.id)+'" data-id="'+c.id+'" class="'+(selectedIds[c.id]?'sel':'')+'">';
-    }
-    $('my-hand').innerHTML = hHtml;
-    
-    var imgs = $('my-hand').querySelectorAll('img');
-    for(var x=0; x<imgs.length; x++) {
-        (function(im){
-            im.onclick = function() {
-                if (G.phase === 'ended') return;
-                playSound('click');
-                var id = im.getAttribute('data-id');
-                if(selectedIds[id]) { delete selectedIds[id]; selectedCount--; }
-                else { selectedIds[id] = true; selectedCount++; }
-                renderAll();
-            };
-        })(imgs[x]);
+    var handSig = handSignature(sorted);
+    if (handSig !== G._lastHandSig) {
+        G._lastHandSig = handSig;
+        var hHtml = '';
+        for(var k=0; k<sorted.length; k++) {
+            var c = sorted[k];
+            hHtml += '<img src="'+img(c.id)+'" data-id="'+c.id+'" decoding="async" class="'+(selectedIds[c.id]?'sel':'')+'">';
+        }
+        $('my-hand').innerHTML = hHtml;
+    } else {
+        // 手牌没变就只切换选中态，避免重建 DOM 导致手机端整手牌闪烁
+        var imgs = $('my-hand').querySelectorAll('img');
+        for(var x=0; x<imgs.length; x++) {
+            imgs[x].classList.toggle('sel', !!selectedIds[imgs[x].getAttribute('data-id')]);
+        }
     }
     
     var hasCards = G.hands[mySeat] && G.hands[mySeat].length > 0;
@@ -2344,8 +2360,15 @@ function renderAll() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    preloadAssets();
-    var lastUser = localStorage.getItem('lastUser');
+    var cachedAssetVer = null;
+    try { cachedAssetVer = localStorage.getItem('ddzAssetVersion'); } catch(e) {}
+    if (cachedAssetVer === ASSET_VERSION) {
+        enterMenuDirect();
+    } else {
+        preloadAssets();
+    }
+    var lastUser = null;
+    try { lastUser = localStorage.getItem('lastUser'); } catch(e) {}
     if (lastUser) {
         document.getElementById('auth-user').value = lastUser;
     }
@@ -2354,6 +2377,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.getElementById('btn-play').onclick = humanPlay;
 document.getElementById('btn-pass').onclick = humanPass;
+document.getElementById('my-hand').addEventListener('click', function(e) {
+    if (G.phase === 'ended') return;
+    var im = e.target;
+    if (!im || im.tagName !== 'IMG') return;
+    toggleCardSelection(im);
+});
 document.getElementById('btn-quit').onclick = function(){ 
     playSound('click');
     if (isSoloMode) {
