@@ -141,9 +141,11 @@ input, button { outline:none; }
 
 #myzone { position:absolute; bottom:0; left:0; right:0; height:var(--myzone-h, 215px); background:#1b5c3d; border-top:2px solid #f7e9b0; z-index:25; display: flex; flex-direction: column; align-items: center; }
 #my-hand { position:absolute; top: 8px; display:flex; justify-content:center; width: 100%; z-index: 1; }
-#my-hand img { width:var(--hand-w, 105px); height:calc(var(--hand-w, 105px) * 1.4); margin-left: var(--hand-overlap, -45px); cursor:pointer; transition: transform 0.15s ease, z-index 0s; position: relative; z-index: 1; border-radius: 6px; box-shadow: -2px 2px 5px rgba(0,0,0,0.3); }
+#my-hand img { width:var(--hand-w, 105px); height:calc(var(--hand-w, 105px) * 1.4); margin-left: var(--hand-overlap, -45px); cursor:pointer; transition: transform 0.15s ease, z-index 0s; position: relative; z-index: 1; border-radius: 6px; box-shadow: -2px 2px 5px rgba(0,0,0,0.3); touch-action: none; -webkit-user-drag: none; user-select: none; -webkit-user-select: none; }
 #my-hand img:first-child { margin-left: 0; }
 #my-hand img.sel { z-index: 20; transform: translateY(-22px); box-shadow: 0 5px 15px rgba(0,0,0,0.6); }
+/* 手动摆牌：按住往左右拖，牌会跟着手指换位 */
+#my-hand img.dragging { z-index: 60 !important; transform: translateY(-26px) scale(1.05) !important; transition: none !important; box-shadow: 0 8px 20px rgba(0,0,0,0.6); cursor: grabbing; }
 
 #my-ctrl { position:absolute; bottom:12px; width:100%; text-align:center; z-index: 30; }
 #my-ctrl button { font-size:16px; font-weight:bold; padding:8px 30px; border-radius:10px; border:none; margin:0 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.4); }
@@ -1227,12 +1229,13 @@ function scoreCandidate(g, name, cards, base, isLead) {
     var score = -handCount(remain) * 1000;
     score += cards.length * ((p.type === 'bomb' || p.type === 'sf') ? 5 : AI_LEN_BONUS);
 
-    // ② 大牌保留硬规则：中前期严禁首出 A/2/3 的单张 / 对子 / 三条
+    // ② 大牌保留：手里还有小牌时，别先把 A/2/3 的单张 / 对子 / 三条甩掉。
+    // 对手只剩 1 张时例外——先出他压不住的牌卡死，比留大牌更重要。
     var isBigCard = keyRank >= RANK_VAL['A'];
     var earlyGame = remain.length > 5 && oppMin > 4;
-    if (isLead && isBigCard && earlyGame &&
+    if (isLead && isBigCard && oppMin > 1 &&
         (p.type === 'single' || p.type === 'pair' || p.type === 'triple')) {
-        score -= 5000;
+        score -= earlyGame ? 5000 : 2600;
     }
 
     // ③ 跟牌：优先最小可压（点数越小越奖励）
@@ -1320,15 +1323,20 @@ function scoreCandidate(g, name, cards, base, isLead) {
         }
     }
 
-    // ⑨ 首出小单张的小惩罚（避免无脑送）
-    if (isLead && p.type === 'single' && keyRank < RANK_VAL['9']) {
-        score -= 150;
+    // ⑨ 首出：手里还有大牌时，优先甩小单张 / 小对子，把 A/2/3 留作回手。
+    // 旧版这里扣小单张的分、给“场上最大”加 400，残局会让电脑先出 3 把小牌留到最后。
+    if (isLead && oppMin > 1 && (p.type === 'single' || p.type === 'pair')) {
+        var myBigLeft = 0;
+        for (var i2 = 0; i2 < remain.length; i2++) {
+            if (RANK_VAL[remain[i2].slice(1)] >= RANK_VAL['A']) myBigLeft++;
+        }
+        if (myBigLeft > 0 && keyRank < RANK_VAL['A']) score += 400;
+        if (keyRank < RANK_VAL['9'] && myBigLeft > 0) score += 200;
     }
 
-    // ⑩ 记牌判断：出的牌是否已是场上最大（记牌器见上面，初级电脑不启用）
-    if (AI_LEVEL > 0 && (p.type === 'single' || p.type === 'pair')) {
-        if (ukHigher === 0) score += 400;
-    }
+    // ⑩ 旧版这里对“出的牌已是场上最大”加 400 分，结果电脑会拿 3/2/A 去
+    // 顶掉一张小牌，把最大的牌提前花光。跟牌的最小可压偏好（③）已经够用，
+    // 所以这条奖励取消。
 
     return score;
 }
@@ -1586,6 +1594,7 @@ function solo_settle(g) {
 }
 
 function start_new_game_solo() {
+    handOrderIds = [];
         // 🔥 随机三个电脑名字（同一轮单机模式内保持不变，累计分会正常继承）
     if (!soloAINames || soloAINames.length < 3) pickSoloAINames();
     var ap = [soloMyName].concat(soloAINames);
@@ -2023,7 +2032,7 @@ function renderAllSingle(tempG) {
         stat.innerHTML = statHtml;
     }
     
-    var sorted = (tempG.hands[0] || []).slice().sort(function(a,b){ return strength(b.id) - strength(a.id); });
+    var sorted = orderHandForDisplay((tempG.hands[0] || []).slice().sort(function(a,b){ return strength(b.id) - strength(a.id); }));
     var handSig = handSignature(sorted);
     if (handSig !== G._lastHandSig) {
         G._lastHandSig = handSig;
@@ -2324,6 +2333,92 @@ function handSignature(cards) {
     return cards.map(function(c){ return c.id || c; }).join(',');
 }
 
+// ===== 手动摆牌（只改前端显示顺序，不影响出牌判定/服务器） =====
+var handOrderIds = [];   // 玩家自己拖出来的从左到右顺序
+
+function orderHandForDisplay(cards) {
+    var current = {};
+    cards.forEach(function(c){ current[c.id] = true; });
+    // 同一局手里只会少牌不会多牌；出现手里没有的旧牌位说明重新发牌了，旧摆法作废
+    var known = {};
+    handOrderIds.forEach(function(id){ known[id] = true; });
+    var anyNew = handOrderIds.length > 0 && cards.some(function(c){ return !known[c.id]; });
+    if (anyNew) handOrderIds = [];
+    handOrderIds = handOrderIds.filter(function(id){ return current[id]; });
+    cards.forEach(function(c){ if (handOrderIds.indexOf(c.id) === -1) handOrderIds.push(c.id); });
+    var rank = {};
+    handOrderIds.forEach(function(id, i){ rank[id] = i; });
+    return cards.slice().sort(function(a, b){ return rank[a.id] - rank[b.id]; });
+}
+
+var handDrag = { el: null, pointerId: null, startX: 0, startY: 0, active: false, suppressClick: false };
+
+function handRowIsHorizontal(hand) {
+    var first = hand.firstElementChild, last = hand.lastElementChild;
+    if (!first || !last || first === last) return true;
+    var a = first.getBoundingClientRect(), b = last.getBoundingClientRect();
+    return Math.abs(b.left - a.left) >= Math.abs(b.top - a.top);
+}
+
+function handPointerDown(e) {
+    if (G.phase === 'ended') return;
+    var im = e.target;
+    if (!im || im.tagName !== 'IMG' || !im.getAttribute('data-id')) return;
+    handDrag.el = im;
+    handDrag.pointerId = e.pointerId;
+    handDrag.startX = e.clientX;
+    handDrag.startY = e.clientY;
+    handDrag.active = false;
+}
+
+function handPointerMove(e) {
+    if (!handDrag.el || e.pointerId !== handDrag.pointerId) return;
+    var hand = $('my-hand');
+    var horizontal = handRowIsHorizontal(hand);
+    var dx = e.clientX - handDrag.startX;
+    var dy = e.clientY - handDrag.startY;
+    var mainMove = horizontal ? dx : dy;
+    var crossMove = horizontal ? dy : dx;
+    if (!handDrag.active) {
+        // 手指要明显沿牌排方向移动才算拖牌，轻点仍然是选牌
+        if (Math.abs(mainMove) < 12 || Math.abs(mainMove) < Math.abs(crossMove)) return;
+        handDrag.active = true;
+        handDrag.el.classList.add('dragging');
+        try { handDrag.el.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+    e.preventDefault();
+    var coord = horizontal ? e.clientX : e.clientY;
+    var el = handDrag.el;
+    var kids = Array.prototype.slice.call(hand.children).filter(function(x){ return x !== el; });
+    var idx = kids.length;
+    for (var i = 0; i < kids.length; i++) {
+        var r = kids[i].getBoundingClientRect();
+        var mid = horizontal ? (r.left + r.width / 2) : (r.top + r.height / 2);
+        if (coord < mid) { idx = i; break; }
+    }
+    var ref = kids[idx] || null;
+    if (ref !== el.nextSibling) hand.insertBefore(el, ref);
+}
+
+function handPointerUp(e) {
+    if (!handDrag.el || e.pointerId !== handDrag.pointerId) return;
+    var wasActive = handDrag.active;
+    handDrag.el.classList.remove('dragging');
+    if (wasActive) {
+        handDrag.suppressClick = true;
+        setTimeout(function(){ handDrag.suppressClick = false; }, 60);
+        var ids = [], imgs = $('my-hand').children;
+        for (var i = 0; i < imgs.length; i++) {
+            var id = imgs[i].getAttribute('data-id');
+            if (id) ids.push(id);
+        }
+        handOrderIds = ids;
+    }
+    handDrag.el = null;
+    handDrag.pointerId = null;
+    handDrag.active = false;
+}
+
 function toggleCardSelection(im) {
     if (!im || im.tagName !== 'IMG') return;
     playSound('click');
@@ -2473,7 +2568,7 @@ function renderAll() {
         stat.innerHTML = statHtml;
     }
     
-    var sorted = (G.hands[mySeat] || []).slice().sort(function(a,b){ return strength(b.id) - strength(a.id); });
+    var sorted = orderHandForDisplay((G.hands[mySeat] || []).slice().sort(function(a,b){ return strength(b.id) - strength(a.id); }));
     var handSig = handSignature(sorted);
     if (handSig !== G._lastHandSig) {
         G._lastHandSig = handSig;
@@ -2518,11 +2613,19 @@ document.addEventListener("DOMContentLoaded", () => {
 document.getElementById('btn-play').onclick = humanPlay;
 document.getElementById('btn-pass').onclick = humanPass;
 document.getElementById('my-hand').addEventListener('click', function(e) {
+    if (handDrag.suppressClick) return;   // 刚拖过牌，不当作点选
     if (G.phase === 'ended') return;
     var im = e.target;
     if (!im || im.tagName !== 'IMG') return;
     toggleCardSelection(im);
 });
+var myHandEl = document.getElementById('my-hand');
+myHandEl.addEventListener('pointerdown', handPointerDown);
+myHandEl.addEventListener('pointermove', handPointerMove);
+myHandEl.addEventListener('pointerup', handPointerUp);
+myHandEl.addEventListener('pointercancel', handPointerUp);
+document.addEventListener('pointerup', handPointerUp);
+document.addEventListener('pointercancel', handPointerUp);
 function setForceRotate(on) {
     if (on) document.body.classList.add('force-rotate');
     else document.body.classList.remove('force-rotate');
