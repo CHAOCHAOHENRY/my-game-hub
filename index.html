@@ -692,6 +692,7 @@ var myDbScore = 0;
 var myRedeemed = {};
 
 var isSoloMode = false; // 🔥 是否处于单机模式
+var enteredGame = false; // 本次进入联机后是否已主动坐下/开始，防止登录后被旧牌局拉回牌桌
 var soloMyName = "我";   // 单机模式下的玩家名字
 // 🔥 单机模式电脑名字池（想加名字直接往数组里塞即可）
 var SOLO_AI_NAME_POOL = [
@@ -2115,15 +2116,21 @@ function doSync() {
             }
         }
         
-        if (isSeated && data.game && data.game.phase === 'ended') {
-            // 结算不显示
-        } else if (isSeated) {
-            $('btn-start-game').classList.remove('hidden');
-        } else {
+        var hasMyGame = !!data.game;
+        if (!isSeated || hasMyGame || !enteredGame) {
+            // 已有牌局（进行中或刚结束）时不显示“开始游戏”，否则会重开一局把整桌人的牌局顶掉；
+            // 想继续旧局，点自己的座位即可。
             $('btn-start-game').classList.add('hidden');
+        } else {
+            $('btn-start-game').classList.remove('hidden');
         }
         
-        if (data.game) {
+        // 只有玩家主动坐下/点开始后才进牌桌；只登录、只进大厅时留在hall，避免被残留牌局拉走
+        if (hasMyGame && !enteredGame && isSeated && !window._rejoinHintShown) {
+            window._rejoinHintShown = true;
+            showToast('你有未完成的牌局，点自己的座位即可继续');
+        }
+        if (data.game && enteredGame) {
             if ($('screen-lobby').style.display !== 'none') {
                 $('screen-lobby').style.display = 'none';
                 $('screen-game').style.display = 'block';
@@ -2280,6 +2287,7 @@ function restartGame() {
         return;
     }
     playSound('click');
+    enteredGame = true;
     fetch(API_BASE + '/api/restart', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table: currentTableId, username: document.getElementById('lobby-user-name').textContent, session_id: mySessionId })
@@ -2751,6 +2759,8 @@ document.getElementById('btn-login').onclick = function() {
             document.getElementById('screen-auth').style.display = 'none';
             document.getElementById('screen-lobby').style.display = 'flex';
             isSoloMode = false;
+            enteredGame = false;
+            window._rejoinHintShown = false;
             startSync(); 
         } else { 
             msg.style.color = "#ff9b9b";
@@ -2804,6 +2814,7 @@ document.querySelectorAll('.seat-btn').forEach(btn => {
                 showToast(data.error);
             }
             else {
+                enteredGame = true;
                 $('btn-start-game').classList.remove('hidden');
                 currentTableId = t;
                 doSync(); 
@@ -2815,6 +2826,7 @@ document.querySelectorAll('.seat-btn').forEach(btn => {
 $('btn-start-game').onclick = function() {
     playSound('click');
     if (!currentTableId) return;
+    enteredGame = true;
     this.classList.add('hidden');
     fetch(API_BASE + '/api/start_game', { 
         method: 'POST', headers: { 'Content-Type': 'application/json' }, 
@@ -2844,7 +2856,7 @@ function renderPrizePool() {
     
     var titles = {
         1: '🔮 星语塔罗占卜',
-        2: '🎁 神秘小程序 2',
+        2: '🌙 中国农历运程',
         3: '🎁 神秘小程序 3',
         4: '🎁 神秘小程序 4',
         5: '🎁 神秘小程序 5',
@@ -2895,6 +2907,8 @@ function renderPrizePool() {
 function openPrize(index) {
     if (index === 1) {
         window.open('/prizes/tarot.html', '_blank');
+    } else if (index === 2) {
+        window.open('/prizes/fortune.html', '_blank');
     }
 }
 
