@@ -105,6 +105,7 @@ input, button { outline:none; }
 #topbar .score-chip .landlord-tag { font-size: 10px; padding: 1px 4px; border-radius: 4px; background: #b80018; color: #fff;}
 #topbar .handno { margin-left:auto; color:#cfe8d0; }
 #btn-quit { margin-left:8px; background:#b34d4d; color:#fff; border:none; border-radius:6px; padding:4px 10px; }
+#btn-orient { display:none; margin-left:6px; background:#2a7ac8; color:#fff; border:none; border-radius:6px; padding:4px 10px; white-space:nowrap; }
 
 #table { position:absolute; top:44px; bottom:var(--myzone-h, 215px); left:0; right:0; }
 .seat { position:absolute; z-index:10; text-align:center; }
@@ -266,6 +267,10 @@ input, button { outline:none; }
     .maker-text { margin-top: 30px; font-size: 16px; }
 }
 
+@media (max-width: 900px) {
+    #btn-orient { display: inline-block; }
+}
+
 @media (max-width: 900px) and (orientation: landscape) {
     :root {
         --hand-w: 65px;          
@@ -281,7 +286,39 @@ input, button { outline:none; }
     #seat-1 { right: 5px; top: 50%; }
     #seat-3 { left: 5px; top: 50%; }
     .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
+    #btn-orient { display: none; }
 }
+
+/* ================= 🔥 竖屏强制横屏模式（系统锁定竖屏时使用） ================= */
+body.force-rotate {
+    --hand-w: 65px;
+    --hand-overlap: -32px;
+    --opp-w: 35px;
+    --trick-w: 70px;
+    --myzone-h: 150px;
+}
+body.force-rotate #screen-game,
+body.force-rotate .dialog-overlay {
+    position: fixed;
+    inset: auto;
+    top: 0;
+    left: 0;
+    width: 100vh;
+    height: 100vw;
+    width: 100dvh;
+    height: 100dvw;
+    transform: rotate(90deg) translateY(-100%);
+    transform-origin: top left;
+}
+body.force-rotate #screen-game { z-index: 4000; }
+body.force-rotate .dialog-overlay { z-index: 5000; }
+body.force-rotate #table { top: 40px; bottom: var(--myzone-h); }
+body.force-rotate #my-hand { top: 5px; }
+body.force-rotate #my-hand img.sel { transform: translateY(-15px); box-shadow: 0 5px 15px rgba(0,0,0,0.6); }
+body.force-rotate #history-panel { width: 140px; max-height: 120px; bottom: 10px; transform: none; }
+body.force-rotate #seat-1 { right: 5px; top: 50%; }
+body.force-rotate #seat-3 { left: 5px; top: 50%; }
+body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
 </style>
 </head>
 <body>
@@ -466,6 +503,7 @@ input, button { outline:none; }
       <div style="display:flex; gap:5px;">
         <span class="score-chip" id="chip-0"></span><span class="score-chip" id="chip-1"></span><span class="score-chip" id="chip-2"></span><span class="score-chip" id="chip-3"></span>
       </div>
+      <button id="btn-orient">横屏</button>
       <button id="btn-quit">离开</button>
   </div>
   <div id="table">
@@ -653,6 +691,30 @@ var myRedeemed = {};
 
 var isSoloMode = false; // 🔥 是否处于单机模式
 var soloMyName = "我";   // 单机模式下的玩家名字
+// 🔥 单机模式电脑名字池（想加名字直接往数组里塞即可）
+var SOLO_AI_NAME_POOL = [
+    '小银', '春燕', '元培', '宝红', '阿雪',
+    '瑞珍', '艳芬', '蕾竹', '添哥', '保镜',
+    '洛尧', '韶锋', '志伟', '国潮', '伟明',
+];
+var soloAINames = [];   // 当前这一轮单机模式使用的 3 个电脑名字
+
+// 从名字池里随机抽 3 个不重复的名字
+function pickSoloAINames() {
+    var pool = SOLO_AI_NAME_POOL.slice();
+    // Fisher-Yates 洗牌
+    for (var i = pool.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    var res = [];
+    for (var k = 0; k < pool.length && res.length < 3; k++) {
+        if (pool[k] === soloMyName) continue;        // 防止和"我"重名
+        if (res.indexOf(pool[k]) !== -1) continue;   // 防止重复
+        res.push(pool[k]);
+    }
+    soloAINames = res;
+}
 var AI_LEVEL = 2;        // 电脑难度：0=初级(不记牌+乱出) 1=中级(top3抖动) 2=高级(确定性最优)
 try { var _aiLv = parseInt(localStorage.getItem('aiLevel'), 10); if (_aiLv === 0 || _aiLv === 1 || _aiLv === 2) AI_LEVEL = _aiLv; } catch(e){}
 
@@ -1524,7 +1586,9 @@ function solo_settle(g) {
 }
 
 function start_new_game_solo() {
-    var ap = [soloMyName, '电脑阿宝', '电脑阿花', '电脑阿东'];
+        // 🔥 随机三个电脑名字（同一轮单机模式内保持不变，累计分会正常继承）
+    if (!soloAINames || soloAINames.length < 3) pickSoloAINames();
+    var ap = [soloMyName].concat(soloAINames);
     var deck = [];
     var suits = ['c','h','s','d'];
     var ranks = ['4','5','6','7','8','9','10','J','Q','K','A','2','3'];
@@ -1921,12 +1985,16 @@ function choiceLandlordSolo(c) {
 
 function renderAllSingle(tempG) {
     for(var i=0; i<4; i++) { 
-        if($('chip-' + i)) {
+        var chipEl = $('chip-' + i);
+        if(chipEl) {
             var pName = tempG.players[i];
             var llHtml = (tempG.landlord === i && tempG.landlord_public) ? '<span class="landlord-tag">地主</span>' : '';
             var tableSc = tempG.table_scores[i] || 0;
-            
-            $('chip-' + i).innerHTML = (i===0?'<u>':'') + pName + '</u>' + llHtml + ` <span class="score-val">本场:${tableSc}</span>`;
+            var chipSig = pName + '|' + llHtml + '|' + tableSc;
+            if (chipEl._chipSig !== chipSig) {
+                chipEl._chipSig = chipSig;
+                chipEl.innerHTML = (i===0?'<u>':'') + pName + '</u>' + llHtml + ` <span class="score-val">本场:${tableSc}</span>`;
+            }
         }
     }
     
@@ -1934,32 +2002,26 @@ function renderAllSingle(tempG) {
         var visualPos = (i - 0 + 4) % 4; 
         var box = $('seat-' + visualPos);
         var cnt = tempG.hands[i] ? tempG.hands[i].length : 0;
+        var isLL = (tempG.landlord === i && tempG.landlord_public) ? 1 : 0;
         
-        var llHtml = (tempG.landlord === i && tempG.landlord_public) ? '<span class="landlord-tag">地主</span>' : '';
-        var html = '<div class="nameplate">'+llHtml+'<span class="p-name">'+tempG.players[i]+'</span><span class="cnt">'+cnt+'张</span></div>';
-        
-        if(i !== 0) {
-            html += '<div class="opp-hand">';
-            for(var j=0; j<Math.min(cnt, 9); j++) html += '<img src="cards/back1.png">';
-            html += '</div>';
-        }
-        box.innerHTML = html;
-        box.className = 'seat' + (tempG.turn === i ? ' turn' : '');
+        var llHtml = isLL ? '<span class="landlord-tag">地主</span>' : '';
+        var plateHtml = llHtml + '<span class="p-name">'+tempG.players[i]+'</span><span class="cnt">'+cnt+'张</span>';
+        setSeatBox(box, plateHtml, i + '|' + tempG.players[i] + '|' + cnt + '|' + isLL, tempG.turn === i, i !== 0 ? cnt : 0);
     }
     
     var el = $('trick-center'); var stat = $('trick-status');
-    var lines = '';
+    var statHtml;
     if (tempG.currentPlay) {
-        lines = '<div class="line">'+tempG.players[tempG.currentPlay.seat]+' 出牌</div>';
-        var ch = '<div class="trick-cards">';
-        tempG.currentPlay.cards.forEach(function(c){ ch += '<img src="'+img(c.id)+'">'; });
-        ch += '</div>';
-        el.innerHTML = ch;
+        statHtml = '<div class="line">'+tempG.players[tempG.currentPlay.seat]+' 出牌</div>';
+        setTrickCards(el, tempG.currentPlay.cards);
     } else {
-        lines = '<div class="line">等待出牌...</div>';
-        el.innerHTML = '';
+        statHtml = '<div class="line">等待出牌...</div>';
+        setTrickCards(el, null);
     }
-    stat.innerHTML = lines;
+    if (stat._statSig !== statHtml) {
+        stat._statSig = statHtml;
+        stat.innerHTML = statHtml;
+    }
     
     var sorted = (tempG.hands[0] || []).slice().sort(function(a,b){ return strength(b.id) - strength(a.id); });
     var handSig = handSignature(sorted);
@@ -2278,10 +2340,91 @@ function toggleCardSelection(im) {
     }
 }
 
+// 座位内容没变就不动 DOM；牌背只增删数量，避免每次电脑出牌整排牌背重建导致闪屏
+function setSeatBox(box, plateHtml, plateSig, isTurn, backCount) {
+    if (!box) return;
+    var plate = box.firstElementChild;
+    if (!plate || !plate.classList.contains('nameplate')) plate = null;
+    if (plateSig !== box._plateSig) {
+        box._plateSig = plateSig;
+        if (!plate) {
+            box.insertAdjacentHTML('afterbegin', '<div class="nameplate"></div>');
+            plate = box.firstElementChild;
+        }
+        plate.innerHTML = plateHtml;
+    }
+
+    var hand = box.querySelector('.opp-hand');
+    var want = Math.min(backCount || 0, 9);
+    if (want > 0) {
+        if (!hand) {
+            box.insertAdjacentHTML('beforeend', '<div class="opp-hand"></div>');
+            hand = box.querySelector('.opp-hand');
+        }
+        while (hand.children.length > want) hand.removeChild(hand.lastElementChild);
+        while (hand.children.length < want) {
+            var im = document.createElement('img');
+            im.src = 'cards/back1.png';
+            hand.appendChild(im);
+        }
+    } else if (hand) {
+        hand.remove();
+    }
+
+    var cls = 'seat' + (isTurn ? ' turn' : '');
+    if (box.className !== cls) box.className = cls;
+}
+
+// 出牌区：先在新容器里解码好图片，再整体替换，旧牌面保留到新牌面可显示为止
+function setTrickCards(el, cards) {
+    var sig = (cards && cards.length) ? cards.map(function(c){ return c.id; }).join(',') : '';
+    if (el._trickSig === sig) return;
+    el._trickSig = sig;
+    if (!sig) { el.innerHTML = ''; return; }
+
+    var wrap = document.createElement('div');
+    wrap.className = 'trick-cards';
+    var imgs = [];
+    cards.forEach(function(c){
+        var im = new Image();
+        im.decoding = 'async';
+        im.src = img(c.id);
+        wrap.appendChild(im);
+        imgs.push(im);
+    });
+
+    var token = (el._trickToken || 0) + 1;
+    el._trickToken = token;
+    var done = false;
+    function swap() {
+        if (done || el._trickToken !== token) return;
+        done = true;
+        el.innerHTML = '';
+        el.appendChild(wrap);
+    }
+    var pending = imgs.length;
+    function oneDone() {
+        pending--;
+        if (pending <= 0) swap();
+    }
+    imgs.forEach(function(im){
+        if (im.decode) {
+            im.decode().then(oneDone, oneDone);
+        } else if (im.complete) {
+            oneDone();
+        } else {
+            im.addEventListener('load', oneDone);
+            im.addEventListener('error', oneDone);
+        }
+    });
+    setTimeout(swap, 200);
+}
+
 function renderAll() {
     // 联机模式渲染
     for(var i=0; i<4; i++) { 
-        if($('chip-' + i)) {
+        var chipEl = $('chip-' + i);
+        if(chipEl) {
             var pName = G.players[i];
             var isOnline = true;
             if (G.players_info && G.players_info[i]) isOnline = G.players_info[i].online;
@@ -2291,8 +2434,11 @@ function renderAll() {
             var llHtml = (G.landlord === pName && G.landlord_public) ? '<span class="landlord-tag">地主</span>' : '';
             var dbScore = G.db_scores[i] || 0;
             var tableSc = G.table_scores[i] || 0;
-            
-            $('chip-' + i).innerHTML = (i===mySeat?'<u>':'') + pName + '</u>' + statusHtml + llHtml + ` <span class="score-val">累计:${dbScore} 本场:${tableSc}</span>`;
+            var chipSig = (i===mySeat?1:0) + '|' + pName + '|' + statusHtml + '|' + llHtml + '|' + dbScore + '|' + tableSc;
+            if (chipEl._chipSig !== chipSig) {
+                chipEl._chipSig = chipSig;
+                chipEl.innerHTML = (i===mySeat?'<u>':'') + pName + '</u>' + statusHtml + llHtml + ` <span class="score-val">累计:${dbScore} 本场:${tableSc}</span>`;
+            }
         }
     }
     
@@ -2306,32 +2452,26 @@ function renderAll() {
         else isOnline = !G.players[i].startsWith('电脑');
         
         var statusHtml = isOnline ? '<span class="status-tag">在线</span>' : '<span class="status-tag offline">电脑</span>';
-        var llHtml = (G.landlord === G.players[i] && G.landlord_public) ? '<span class="landlord-tag">地主</span>' : '';
+        var isLL = (G.landlord === G.players[i] && G.landlord_public) ? 1 : 0;
+        var llHtml = isLL ? '<span class="landlord-tag">地主</span>' : '';
         
-        var html = '<div class="nameplate">'+statusHtml+llHtml+'<span class="p-name">'+G.players[i]+'</span><span class="cnt">'+cnt+'张</span></div>';
-        
-        if(i !== mySeat) {
-            html += '<div class="opp-hand">';
-            for(var j=0; j<Math.min(cnt, 9); j++) html += '<img src="cards/back1.png">';
-            html += '</div>';
-        }
-        box.innerHTML = html;
-        box.className = 'seat' + (G.turn === i ? ' turn' : '');
+        var plateHtml = statusHtml+llHtml+'<span class="p-name">'+G.players[i]+'</span><span class="cnt">'+cnt+'张</span>';
+        setSeatBox(box, plateHtml, mySeat + '|' + i + '|' + G.players[i] + '|' + cnt + '|' + isOnline + '|' + isLL, G.turn === i, i !== mySeat ? cnt : 0);
     }
     
     var el = $('trick-center'); var stat = $('trick-status');
-    var lines = '';
+    var statHtml;
     if (G.currentPlay) {
-        lines = '<div class="line">'+G.players[G.currentPlay.seat]+' 出牌</div>';
-        var ch = '<div class="trick-cards">';
-        G.currentPlay.cards.forEach(function(c){ ch += '<img src="'+img(c.id)+'">'; });
-        ch += '</div>';
-        el.innerHTML = ch;
+        statHtml = '<div class="line">'+G.players[G.currentPlay.seat]+' 出牌</div>';
+        setTrickCards(el, G.currentPlay.cards);
     } else {
-        lines = '<div class="line">等待出牌...</div>';
-        el.innerHTML = '';
+        statHtml = '<div class="line">等待出牌...</div>';
+        setTrickCards(el, null);
     }
-    stat.innerHTML = lines;
+    if (stat._statSig !== statHtml) {
+        stat._statSig = statHtml;
+        stat.innerHTML = statHtml;
+    }
     
     var sorted = (G.hands[mySeat] || []).slice().sort(function(a,b){ return strength(b.id) - strength(a.id); });
     var handSig = handSignature(sorted);
@@ -2383,6 +2523,26 @@ document.getElementById('my-hand').addEventListener('click', function(e) {
     if (!im || im.tagName !== 'IMG') return;
     toggleCardSelection(im);
 });
+function setForceRotate(on) {
+    if (on) document.body.classList.add('force-rotate');
+    else document.body.classList.remove('force-rotate');
+    var b = document.getElementById('btn-orient');
+    if (b) b.textContent = on ? '竖屏' : '横屏';
+}
+
+// 系统本身已经横屏时自动退出强制旋转，避免转两次
+var _orientMQ = window.matchMedia('(orientation: landscape)');
+function _onOrientChange(e) {
+    if (e.matches && document.body.classList.contains('force-rotate')) setForceRotate(false);
+}
+if (_orientMQ.addEventListener) _orientMQ.addEventListener('change', _onOrientChange);
+else if (_orientMQ.addListener) _orientMQ.addListener(_onOrientChange);
+
+document.getElementById('btn-orient').onclick = function(){
+    playSound('click');
+    setForceRotate(!document.body.classList.contains('force-rotate'));
+};
+
 document.getElementById('btn-quit').onclick = function(){ 
     playSound('click');
     if (isSoloMode) {
@@ -2414,6 +2574,7 @@ document.getElementById('btn-menu-solo').onclick = function() {
     playBGM();
     playSound('click'); 
     isSoloMode = true;
+    pickSoloAINames();  
     selectedIds = {}; selectedCount = 0;
     document.getElementById('screen-menu').style.display = 'none';
     document.getElementById('screen-game').style.display = 'block';
