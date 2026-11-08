@@ -105,7 +105,7 @@ input, button { outline:none; }
 #topbar .score-chip .landlord-tag { font-size: 10px; padding: 1px 4px; border-radius: 4px; background: #b80018; color: #fff;}
 #topbar .handno { margin-left:auto; color:#cfe8d0; }
 #btn-quit { margin-left:8px; background:#b34d4d; color:#fff; border:none; border-radius:6px; padding:4px 10px; }
-#btn-orient { display:none; margin-left:6px; background:#2a7ac8; color:#fff; border:none; border-radius:6px; padding:4px 10px; white-space:nowrap; }
+#btn-orient { display:none; position:absolute; top:50px; right:8px; z-index:46; background:rgba(42,122,200,0.92); color:#fff; border:1px solid rgba(255,255,255,0.55); border-radius:14px; padding:5px 12px; white-space:nowrap; font-size:12px; }
 
 #table { position:absolute; top:44px; bottom:var(--myzone-h, 215px); left:0; right:0; }
 .seat { position:absolute; z-index:10; text-align:center; }
@@ -503,9 +503,9 @@ body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
       <div style="display:flex; gap:5px;">
         <span class="score-chip" id="chip-0"></span><span class="score-chip" id="chip-1"></span><span class="score-chip" id="chip-2"></span><span class="score-chip" id="chip-3"></span>
       </div>
-      <button id="btn-orient">横屏</button>
       <button id="btn-quit">离开</button>
   </div>
+  <button id="btn-orient">横屏</button>
   <div id="table">
     <div class="seat" id="seat-0"></div><div class="seat" id="seat-1"></div><div class="seat" id="seat-2"></div><div class="seat" id="seat-3"></div>
     <div id="trick-status"></div><div id="trick-center"></div>
