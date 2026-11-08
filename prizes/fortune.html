@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7d1f19">
+<title>中国农历运程</title>
+<style>
+  :root{
+    --ink:#372b20;
+    --ink-soft:#584733;
+    --muted:#8a7963;
+    --red:#8c2f24;
+    --red-deep:#6d1f18;
+    --gold:#c19a4b;
+    --gold-soft:#e3cfa4;
+    --line:#e5d7bd;
+    --card:#fffdf7;
+    --shadow:0 30px 80px -24px rgba(74,45,20,.38), 0 12px 30px -18px rgba(74,45,20,.25);
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    color:var(--ink);
+    font-family:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC","SimSun",serif;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(140,47,36,.10), transparent 38%),
+      radial-gradient(circle at 90% 10%, rgba(193,154,75,.15), transparent 34%),
+      radial-gradient(circle at 50% 112%, rgba(140,47,36,.08), transparent 46%),
+      linear-gradient(165deg,#fbf7ee 0%,#f4ebda 48%,#efe2cc 100%);
+    background-attachment:fixed;
+    position:relative;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    opacity:.32;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(120,90,50,.035) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(90deg, rgba(120,90,50,.025) 0 1px, transparent 1px 4px);
+    mix-blend-mode:multiply;
+  }
+  body::after{
+    content:"";
+    position:fixed;
+    width:min(62vw,760px);
+    aspect-ratio:1;
+    right:-18vw;
+    top:-24vw;
+    border-radius:50%;
+    pointer-events:none;
+    background:radial-gradient(circle at 38% 38%, rgba(255,250,235,.85), rgba(238,220,180,.32) 45%, transparent 70%);
+    filter:blur(2px);
+  }
+  .page{
+    position:relative;
+    z-index:1;
+    width:min(900px,100%);
+    margin:0 auto;
+    padding:clamp(22px,4.5vw,58px) clamp(14px,3.5vw,28px) calc(clamp(28px,5vw,60px) + env(safe-area-inset-bottom));
+  }
+  .card{
+    position:relative;
+    overflow:hidden;
+    padding:clamp(26px,5vw,52px) clamp(20px,4.6vw,54px) clamp(24px,4.5vw,46px);
+    background:linear-gradient(180deg,#fffefa 0%,var(--card) 45%,#fdf8ed 100%);
+    border:1px solid var(--line);
+    border-radius:22px;
+    box-shadow:var(--shadow);
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    inset:11px;
+    border:1px solid rgba(140,47,36,.10);
+    border-radius:14px;
+    pointer-events:none;
+  }
+  .card::after{
+    content:"";
+    position:absolute;
+    left:12%;
+    right:12%;
+    top:0;
+    height:3px;
+    background:linear-gradient(90deg,transparent,var(--gold),var(--red),var(--gold),transparent);
+    opacity:.8;
+  }
+  .corner{
+    position:absolute;
+    width:22px;
+    height:22px;
+    border-color:rgba(193,154,75,.65);
+    border-style:solid;
+    pointer-events:none;
+  }
+  .corner.tl{top:18px;left:18px;border-width:1px 0 0 1px;border-top-left-radius:8px;}
+  .corner.tr{top:18px;right:18px;border-width:1px 1px 0 0;border-top-right-radius:8px;}
+  .corner.bl{bottom:18px;left:18px;border-width:0 0 1px 1px;border-bottom-left-radius:8px;}
+  .corner.br{bottom:18px;right:18px;border-width:0 1px 1px 0;border-bottom-right-radius:8px;}
+  .watermark{
+    position:absolute;
+    right:-26px;
+    bottom:-52px;
+    font-family:"STKaiti","KaiTi","Kaiti SC","SimSun",serif;
+    font-size:250px;
+    line-height:1;
+    color:rgba(140,47,36,.04);
+    pointer-events:none;
+    user-select:none;
+  }
+  .hero{position:relative;text-align:center;}
+  .emblem{
+    width:60px;
+    height:60px;
+    margin:0 auto 16px;
+    display:grid;
+    place-items:center;
+    border-radius:50%;
+    color:#fff6e6;
+    font-family:"STKaiti","KaiTi","Kaiti SC","SimSun",serif;
+    font-size:27px;
+    line-height:1;
+    background:radial-gradient(circle at 35% 28%,#a83a2e,#7a211a 72%);
+    box-shadow:
+      0 12px 26px -12px rgba(109,31,24,.85),
+      inset 0 0 0 2px rgba(255,240,210,.55),
+      inset 0 0 0 6px rgba(109,31,24,.9);
+  }
+  h1{
+    margin:0;
+    font-size:clamp(30px,5.4vw,46px);
+    font-weight:700;
+    letter-spacing:.16em;
+    text-indent:.16em;
+    color:var(--red-deep);
+    text-shadow:0 1px 0 #fff, 0 10px 26px rgba(109,31,24,.12);
+  }
+  .subtitle{
+    max-width:640px;
+    margin:14px auto 0;
+    color:var(--muted);
+    font-size:clamp(13px,2.2vw,15px);
+    line-height:1.95;
+    letter-spacing:.04em;
+  }
+  .subtitle .wide{display:none;}
+  .ornament{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    max-width:340px;
+    margin:22px auto 0;
+  }
+  .ornament .rule{
+    flex:1;
+    height:1px;
+    background:linear-gradient(90deg,transparent,var(--gold-soft));
+  }
+  .ornament .rule:last-child{background:linear-gradient(90deg,var(--gold-soft),transparent);}
+  .ornament .gem{
+    width:8px;
+    height:8px;
+    background:var(--red);
+    transform:rotate(45deg);
+    box-shadow:0 0 0 3px rgba(140,47,36,.12);
+  }
+  .picker{margin-top:clamp(26px,4.2vw,36px);}
+  .field-label{
+    display:block;
+    margin-bottom:12px;
+    color:var(--ink-soft);
+    font-size:clamp(15px,2.4vw,17px);
+    letter-spacing:.06em;
+    text-align:center;
+  }
+  .controls{display:flex;align-items:stretch;justify-content:center;gap:14px;}
+  .select-wrap{position:relative;flex:0 1 360px;max-width:360px;}
+  select{
+    width:100%;
+    appearance:none;
+    -webkit-appearance:none;
+    font:inherit;
+    font-size:16px;
+    color:var(--ink);
+    letter-spacing:.05em;
+    padding:13px 48px 13px 16px;
+    background:linear-gradient(180deg,#fffdf8,#faf4e7);
+    border:1px solid #d9c7a5;
+    border-radius:12px;
+    box-shadow:inset 0 1px 0 #fff, 0 2px 6px rgba(100,70,30,.06);
+    cursor:pointer;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  select,.test-btn{min-height:50px;}
+  select:hover{border-color:#c6ad80;}
+  select:focus{
+    outline:none;
+    border-color:var(--red);
+    box-shadow:0 0 0 3px rgba(140,47,36,.12), inset 0 1px 0 #fff;
+  }
+  .chev{
+    position:absolute;
+    right:16px;
+    top:50%;
+    width:18px;
+    height:18px;
+    transform:translateY(-50%);
+    color:var(--red);
+    pointer-events:none;
+  }
+  .test-btn{
+    flex:0 0 auto;
+    font:inherit;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:.14em;
+    color:#fff9ee;
+    padding:13px 30px 13px 34px;
+    background:linear-gradient(180deg,#a03327,#7d2119);
+    border:1px solid #6d1c15;
+    border-radius:12px;
+    cursor:pointer;
+    box-shadow:0 12px 24px -10px rgba(109,31,24,.7), inset 0 1px 0 rgba(255,255,255,.22);
+    transition:transform .18s, box-shadow .18s, filter .18s;
+    touch-action:manipulation;
+  }
+  .test-btn:hover{
+    transform:translateY(-1px);
+    filter:brightness(1.05);
+    box-shadow:0 16px 28px -10px rgba(109,31,24,.75), inset 0 1px 0 rgba(255,255,255,.22);
+  }
+  .test-btn:active{
+    transform:translateY(1px);
+    box-shadow:0 6px 14px -8px rgba(109,31,24,.7), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .test-btn:focus-visible{outline:3px solid rgba(193,154,75,.55);outline-offset:3px;}
+  .result{
+    position:relative;
+    min-height:190px;
+    margin-top:clamp(24px,4vw,36px);
+    padding:clamp(20px,3.6vw,34px);
+    background:linear-gradient(180deg,#fdfaf2,#faf3e4);
+    border:1px solid var(--line);
+    border-radius:16px;
+  }
+  .result::before{
+    content:"";
+    position:absolute;
+    left:clamp(20px,3.6vw,34px);
+    right:clamp(20px,3.6vw,34px);
+    top:0;
+    height:1px;
+    background:linear-gradient(90deg,transparent,rgba(193,154,75,.55),transparent);
+  }
+  .empty{
+    min-height:150px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:20px;
+    padding:24px 10px;
+    text-align:center;
+    color:var(--muted);
+    font-size:15px;
+    letter-spacing:.08em;
+  }
+  .moon{
+    position:relative;
+    width:62px;
+    height:62px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fdf3d4,#e8cd8f 70%,#d9b566);
+    box-shadow:0 0 0 8px rgba(193,154,75,.08), 0 16px 30px -18px rgba(160,120,50,.8);
+  }
+  .moon::before,
+  .moon::after{
+    content:"";
+    position:absolute;
+    border-radius:50%;
+    background:rgba(180,140,70,.20);
+  }
+  .moon::before{width:14px;height:14px;top:16px;left:14px;}
+  .moon::after{width:9px;height:9px;bottom:14px;right:16px;}
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:7px 15px;
+    color:var(--red);
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:.08em;
+    background:rgba(140,47,36,.07);
+    border:1px solid rgba(140,47,36,.18);
+    border-radius:999px;
+  }
+  .badge::before{
+    content:"";
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:var(--red);
+    box-shadow:0 0 0 3px rgba(140,47,36,.10);
+  }
+  h2{
+    margin:16px 0 14px;
+    color:var(--red-deep);
+    font-size:clamp(20px,3.4vw,25px);
+    font-weight:700;
+    letter-spacing:.1em;
+  }
+  h2::after{
+    content:"";
+    display:block;
+    width:46px;
+    height:2px;
+    margin-top:10px;
+    background:linear-gradient(90deg,var(--gold),transparent);
+  }
+  .result-body{
+    color:#3b3025;
+    font-size:clamp(15px,2.6vw,17px);
+    line-height:2.08;
+    text-align:justify;
+    text-indent:2em;
+    letter-spacing:.01em;
+  }
+  .content.show{animation:reveal .5s cubic-bezier(.2,.8,.25,1) both;}
+  @keyframes reveal{
+    from{opacity:0;transform:translateY(10px);}
+    to{opacity:1;transform:none;}
+  }
+  [hidden]{display:none !important;}
+  @media (min-width:600px){
+    .subtitle .wide{display:inline;}
+  }
+  @media (max-width:560px){
+    .card{border-radius:18px;}
+    .corner{width:16px;height:16px;}
+    .corner.tl{top:14px;left:14px;}
+    .corner.tr{top:14px;right:14px;}
+    .corner.bl{bottom:14px;left:14px;}
+    .corner.br{bottom:14px;right:14px;}
+    .watermark{font-size:170px;right:-18px;bottom:-34px;}
+    .controls{flex-direction:column;}
+    .select-wrap{max-width:none;flex:1 1 auto;}
+    .test-btn{width:100%;padding-left:30px;}
+    .result{min-height:170px;}
+    .result-body{text-align:left;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important;scroll-behavior:auto !important;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <main class="card">
+    <span class="corner tl" aria-hidden="true"></span>
+    <span class="corner tr" aria-hidden="true"></span>
+    <span class="corner bl" aria-hidden="true"></span>
+    <span class="corner br" aria-hidden="true"></span>
+    <span class="watermark" aria-hidden="true">運</span>
+
+    <header class="hero">
+      <div class="emblem" aria-hidden="true">運</div>
+      <h1>中国农历运程</h1>
+      <p class="subtitle">来自古代中国农历历法记载，分析出三十种不同人格运数，<br class="wide">特性规律，极有参考的价值！！</p>
+      <div class="ornament" aria-hidden="true">
+        <span class="rule"></span>
+        <span class="gem"></span>
+        <span class="rule"></span>
+      </div>
+    </header>
+
+    <form class="picker" id="form" autocomplete="off">
+      <label class="field-label" for="day">请输入农历初几出生日子：</label>
+      <div class="controls">
+        <div class="select-wrap">
+          <select id="day" name="day"></select>
+          <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 8l5 5 5-5"/>
+          </svg>
+        </div>
+        <button class="test-btn" type="submit">开始测试</button>
+      </div>
+    </form>
+
+    <section class="result" id="result" aria-live="polite">
+      <div class="empty" id="empty">
+        <div class="moon" aria-hidden="true"></div>
+        <p>选择农历出生日子，点“开始测试”</p>
+      </div>
+      <div class="content" id="content" hidden>
+        <div class="badge" id="badge"></div>
+        <h2 id="result-title"></h2>
+        <div class="result-body" id="result-text"></div>
+      </div>
+    </section>
+  </main>
+  <noscript><p style="text-align:center;color:#8a7963;">请启用 JavaScript 后使用。</p></noscript>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var DAYS = ["初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "二十一", "二十二", "二十三", "二十四", "二十五", "二十六", "二十七", "二十八", "二十九", "三十"];
+  var FORTUNES = ["初一出生之人，雖然福氣和官祿的運勢無法兩者兼美，不過財運倒是相當不錯，經常受到貴人引薦，而使事業能有順利發展的機會。初一出生的女性大多具有興旺夫家的命格，婚後多能有效提升家庭的經濟狀況。整體大運方面：年少時期的運勢比較平常，中年以後運勢逐漸好轉，而能取得財富與名聲，但若是過於志得意滿，汲汲於浮名富貴的追求，將會使好運由盛轉衰，應多加留心注意；晚年之時生活豐足無憂，而能享有福運綿長的退休時光。", "初二出生的男女，心地端正純潔，與人相處也都親愛和善，少有爭執。雖然身體方面健康無憂，但家族緣份通常較為淡薄，稍有離鄉背井赴遠地成家立業的趨勢。整體大運方面：少年時期運勢辛苦，難以從兄弟家庭獲得協助與庇佑，而必須仰賴自己獨立建設；中年以後運勢逐漸開展，無論財富或事業都有開通發展的機會。這一天出生之人，男子多半相貌清秀，女子則具有聰明發達的命格。", "初三出生之人，若是已經結婚者，應注意夫妻間雖然相處和睦，卻有無法共同生活到老的問題；子女運薄弱的初三之人，略有缺乏子女的現象，因此平日最好涵養德性，修身修德，以累積自身的福份，改善自我的子女運勢。整體大運方面；早年多所磨練，二十歲以後受到先人的余澤，而有獲得提拔、得好運道的機會；四十歲後運勢達到高點，不但事業發展順利，家庭生活也豐足無慮，而呈現榮華興盛的景象。", "初四出生之人，無論男女，大多好學且才智出眾。整體大運方面：少年時期較不和順，行事略有拖磨波折的感覺；中年以後運勢逐漸提升，而能順利發展事業，廣進財源。唯獨必須留心家庭生活的相處，多有是非紛爭，若是遠行外出發展，則容易獲得貴人相助。已經結婚之人，夫妻感情和順融洽，家庭圓滿無憂。及至晚年，運勢已趨平順，財務狀況豐足良好，生活方面也吉利安泰，少有煩惱，可以說是快樂富足的命格。", "初五出生之人，多半天生聰明伶俐，且自身福祿深厚。雖然家庭關係融洽緊密，兄弟姊妹之間的相處也十分和樂，可惜並無任何親屬能夠使你獲得依靠仰賴，而使你在很年少的時候便已經步入社會。整體大運方面：少年時期較為辛勞，所幸自身才藝豐足，而使學業及事業發展順利；中年以後運勢開始亨通發達，財務收入也日趨穩定；晚年時期生活安穩平順，少有煩惱，可以說是無匱乏的命格。", "初六出生之人，興趣廣泛而好學，但由於少有專精，而使成就較不顯著。個性方面，初六出生的男女大多清閒樂觀，家庭運勢上沒有父兄可以倚賴，因此多有白手起家的趨勢。整體大運方面：少年時期發展有限，事業及財富累積都有瓶頸出現；中年之時運勢仍舊平凡，及至中年晚期才開始運勢亨通。為人處事之時，應多加注意長幼尊卑間的分際，與人交往也應抱持親善和睦的態度面對，如此才能獲得貴人提拔，而有發達成功的機會。", "初七出生之人，性格複雜，心性起伏變化較大，常有臨事改變心意的狀況發生。整體大運方面：一生大多安樂順心，無論在工作或財務收入都能常保好運，而使生活豐足無憂。家庭方面，親緣關係良好，兄姊妹間的相處融洽和樂，且多能在事業發展上有所成就。此日出生的女子，性格較為保守平淡，但深具福祿，且身體健全，是屬於長壽康泰的命格。", "初八出生之人，性情伶俐，為人處事圓滿順遂。由於本身具備才能，而能成為輔助自己發展事業的利器，使人生安樂平順，一切無憂。整體大運方面：與父母親的親緣較為淡薄，因此少年時期很早便離開家庭到異地求學或發展。中年時，運勢順暢發達，可望在此時成就功名。事業發展上，赴外地工作容易受到貴人的協助與庇佑，而能順利取得良機，事事如意亨通，是屬於晚年榮華富裕的命格。", "初九出生之人，身體健康，性格清明開朗，因而容易受到他人的敬重與愛戴。為人處事方面應勤儉行善，並多多勸勉及鼓勵他人，使德行能夠廣批鄰里朋友，為自己累積福德。整體大運方面：少年與中年時期的運勢較為普通，學業及事業的發展雖然沒有太突出的表現，卻能平順如意渡過。及至晚年運勢開始走強，事業及財務收入水漲船高，而自身深厚的福祿也使晚年博得的名聲利祿能夠長久保存，而深受眾人稱道，可以說是慈悲勤勉的命格類型。", "初十出生之人，天生為人伶俐，待人忠誠坦白。雖然因為家族緣份比較淡薄，而有早年離開家庭到異地求學或發展的趨勢，所幸個性豪爽慷慨，樂於與人交遊，而能獲得眾多朋友，為自己帶來助力與貴人運。整體大運方面：少年時期來自家族或父兄的庇佑較少，因此略顯辛苦波折；中年之後運勢逐漸開拓，及至晚年更為振興，無論事業或技藝發展都能順利且有所成就，是屬於晚年安樂的命格。", "十一日出生之人，聰慧敏銳且意志堅定，處事決策具有過人的決斷力。整體大運方面：少年時期運勢開拓較遲，學業或事業表現較不突出；中年之時運勢略有走低，此時雖然有意外橫財的機會出現，卻容易因為缺乏長遠妥善的規劃，導致好運經常錯身而過。這段時間應謹慎小心，三思而行，財源及事業的謀求與發展才能順勢而來。晚年之後，運勢漸趨平穩順利，算是屬於具有福分、大器晚成的命格。", "十二日出生之人，為人溫良敦厚，個性刻苦耐勞，日常生活起居簡樸踏實，念舊節儉的性情使十二日出生之人多半具有收藏儲存物品的習慣，對於舊物也較捨不得隨意丟棄。整體大運方面：少年時期運勢較不和順，行事多有波折；中年之時運勢開拓亨通，事業發展順利，財務收入源源不絕，個人聲望與社會地位也可望達到頂峰。晚年時期運勢持續走高，並有餘力庇佑子孫，使家族繁榮興盛，可以說是屬於福祿豐盈飽滿的命格。", "十三日出生之人，性情清明耿直，為人處事遵守道德，因此極受他人的敬重與愛戴。由於前人福蔭庇佑，使十三日出生之人，無論男女，一生在錢財與資金的運用上都沒有困頓匱乏的疑慮，此日出生的女性甚至運主富貴，而能享有豐盈無憂的舒適生活。整體大運方面︰貴人運勢相當強盛，步入社會以後，經常有機會獲得貴人提拔，而能順利無阻地獲取成功，無論事業或名聲都可望在盛年之時達到頂峰，可以說是屬於金錢運勢十分強盛的命格。", "十四日出生之人，為人敦厚穩重，個性閑靜而不妄動，因此很容易成為團體中眾人都十分看重的角色。在個人特質方面，這一天出生的男性多半面貌秀麗脫俗，女性則具備敏銳的天資與細膩靈巧的心思。整體大運方面︰命中自有貴人幫助的十四日生男女，少年時期運勢普通，學業或事業發展並沒有特別突出之處，若是能夠努力奮進，善加利用千金難求的貴人幫助，必可望在中年之時開拓自我運勢，及至晚年時更可發跡顯達，是屬於厚分的命格。", "十五日出生之人，個性柔順，為人溫和篤實，已經結婚者，夫妻相處間多半相互敬重，而能使德澤批及子孫。唯獨應注意子孫若有好爭勇鬥狠的不吉相剋之相，須多加留心管教方式，以免造成行為偏差，損及自我前程。整體大運方面︰男性家庭親緣較為淺薄，因此容易離開故鄉，在外地生活發展；女性則命運略顯乖舛，與丈夫緣份較淺，而容易發生生離死別的狀況，宜婚配命格較為硬直的男性，大體說來是屬於平凡如常的命格。", "十六日出生之人，天生資質聰穎敏睿，心思細巧，無論學習任何才藝都能很快通達，超出同輩許多。整體大運方面：由於自身的學習能力過人，無論學業或課餘才藝的表現都相當出色，因此能夠獲得眾人的矚目。青年時期如果能夠就自身擅長的才藝領域不間斷地持續鑽研，並勤於課業的學習與努力，便可使技巧純熟，而在中年之時成功發達。唯獨必須注意自身氣度的培養，與人共事時，若有成功美名，不應貪婪獨享，以免遭人評論攻擊，造成行事煩勞慌亂。大體說來，是略屬於憂悶類型的命格。", "十七日出生之人，天生資靈敏，心思細巧，雖然聰慧不足，但性格上的忍耐力相當過人。整體大運方面：少年時期運勢多舛，家族親緣，來自父兄的庇佑與幫助很少，大多只能仰賴自己的力量經營生計。此外，這段期間也較容易遭受傷害，苦難及意外也略有接踵而至的感覺，所幸自身心思還算細密，而能夠善加掩飾安排，使乖舛運勢所帶來的阻礙不至於禍及身旁之人。中年以後運勢逐漸開始拓展，事業發展上有許多絕佳的好機會，財務收入也有源源不絕的趨勢，是屬於晚年發達的命格。", "十八日出生之人，才智與勇力都十分令人敬畏，但因性情過於剛烈強勁，經常與人出現口角爭執。整體大運方面：少年時期運勢孤單，除了家庭親緣淺薄，無法從父兄身上取得協助之外，自身頗有聰明而導致行事容易率然逞能，也是使十八日出生之人不易與人團隊合作或共同相處的主要原因之一。由於獨來獨往成性，因此在處理事物之時，也較不信任他人，對於他人有出現危害自己發展的狀況也難以容忍，而有刻意排擠他人的現象出現。常態如此，將使個人福份減弱、人際關係下降。中年之後運勢平平，並無波折困阻，卻也無興盛繁榮的機運，是屬於平凡普通的命格。", "十九日出生之人，天生家庭環境優渥，個人運勢也相當強盛。唯獨須提防桃色之災，以免惹來暗疾，有苦難言。整體大運方面：年少時期運勢極佳，無論學業、事業都能順利推展，並且獲得相當美好的評價。個人聲望及財利收入也能同時兼得，可以說是少年得志的典型。中年之後運勢逐漸趨緩，雖然沒有少年時期的風光大運，但穩定地維持原有成就，倒也能夠享有平穩安泰的生活。晚年以後，運勢持平，只要能夠控制收支平衡，則可望獲得舒適穩固的退休生活，算是一生都頗具榮華的命格。", "二十日出生之人，一生運勢波折，臨事總有意外風波出現，因而造成身心上的煩憂與勞苦。雖然人生路途中的困阻看似繁多，行事也多半必須四處奔走，所幸總能藉此獲得人生命題的解答，為自己開創不同的領域與境界。整體大運方面：少年時期運勢多舛，加上親緣淺薄，家庭父兄所給予的助力不多，因此多半會在年少之時赴外求學或發展事業，此日出生的男性尤其容易如此；步入中年後，運勢較有開拓，出外發展容易獲得財利，而命運中的吉、害雖然互有增減，所幸都有貴人從中相助。晚年以後運勢大開，事業及財務收入亨通發達，可以說是屬於逐日昌盛的命格。", "二十一日出生之人，個性急進，處事本領高強，並具不懼困難與挫折的勇氣與毅力。此日出生的男女，命中帶有財運，卻因無法接納他人意見，而略有偏好從事投機事業的傾向。整體大運方面︰早年運勢不錯，學業及事業發展平順如意，已經結婚的男性，妻子多半具備才幹，對內能夠掌管家中大小事物，對外也能輔助你成就功名；事業方面則因有貴人扶持引薦，而得以和諧順利。中年之時，運勢由盛轉平，這段時間若是做事無法全心全意，則無不易在晚年時成就顯達的功業，大體來說是屬於晚年之命。", "二十二日出生之人，天生資質靈敏，理解力高於他人，為人處事守信講道義，從不做欺詐或訛騙他人之事。整體大運方面：少年時期較多災難，凡事必須經歷苦勞才能獲得成功；中年之時運勢持續低平，雖然中途困阻不少，但若能加倍努力，便能為自己累積實力，開拓良機。晚年時期運勢突破困境，事業及財務收入大為振興，個人聲望及社會地位也能在此時達到巔峰，生活及家庭狀況一切平順無憂，可以說是晚年之後名利與成就豐收的命格。", "二十三日出生之人，個性多變，性格也較不穩定，連帶使自身運勢受到影響，而有吉凶交互增減的現象出現。整體大運方面︰少年時期心志浮動，不但做事定性不足，生活上也居無定所，身心無所依憑的結果，使你容易與人發生爭鬥，各方面發展也較沒有突破性的成果。中年之時運勢仍無起色，此時若能勤勉致力於事業或技藝的發展與鑽研，矯正自身的缺點，便能在晚年創造好運道。晚年以後，福運到臨，事業及財務收入都能達到頂峰，是屬於平安福壽的命格。", "二十四日出生之人，個性開朗親切、樂於助人，因而受到他人的擁護與愛戴。個人特質方面，除了深具才能之外，行事專一的態度也使二十四日出生之人能夠貫徹始終，直到達成目標為止。整體大運方面︰生性喜好積存財富的你，天生具備理財觀念，除了能夠開源之外，也相當懂得節流，因此一生財務豐足，少有匱乏的疑慮。事業方面，出外發展容易逢遇貴人相助，若有機會赴外地工作，應把握機會。婚姻方面，由於命中有刑克妻子之害，因此最好婚配命格強硬的對象。大體說來是屬於昌盛繁榮的命格。", "二十五日出生之人，個性忠厚老實，且具備專注執著的特性，因此事業發展多能有成。此日出生的男女相當重視家庭，唯獨天性好事，因此常踰越本分，插手干涉他人的事情，若是成人美事，則能博得好名，但若是壞人之事，便會惹來無謂的批評與責難。此日出生的男性婚姻運勢頗佳，婚後將可以獲得妻子的幫助成就事業。整體大運方面，年少之時由於性情較不安定，為人處事常有評斷不公的狀況出現；中年以後運勢趨於平順，只要付出努力，多半可以獲取成果。晚年之後運勢亨通發達，事業及名聲都能發跡顯著，是屬於大旺興隆的命格。", "二十六日出生之人，個性溫柔慈悲，為人處事敦厚善良，經常扶助弱小，因而能夠獲得眾人的景仰與愛戴。整體大運方面︰少年時期運勢較差，無論學業或事業發展，都必須經過十分扎實的努力，才能獲取成果。中年之時運勢逐漸開通，由於處世態度坦承而不欺瞞，因此深獲上司及長輩的喜愛，而能受到極大的提攜與扶持。晚年以後運勢持續走高，事業發展已趨成熟，財務收入也相當豐足，加以生性勤勞儉樸，好儲存財物，因而能夠享有安適無憂的晚年生活，是屬於功成名就類型的命格。", "二十七日出生之人，雖然性情較為奇變巧詐，日常生活卻十分簡樸勤勞，並能努力不懈於工作之中。此日出生的男女，財運緣分淡薄，因此收入雖多，但額外的支出也不少，若沒有妥善規劃自身的財務管理，則難以累積財富。整體大運方面：少年時期心性變動不定，且居無安定之所，無論學業或事業發展都多所阻礙，難以順利獲取成功。中年時期，運勢略有好轉，事業發展以朝往國外較易成功，若能努力堅持到底，必可成就功名。晚年之時，運勢趨於平穩，生活豐足無憂，可以說是晚年成功的命格。", "二十八日出生之人，婚姻運勢多有波折，早婚者命中多有不吉，若能晚婚，則可獲得平和溫順的夫妻生活。整體大運方面︰幼年時期身體較差，容易罹患疾病；青年時期運勢較差，家族親緣淡薄，來自親戚朋友或家人的助力少，多半必須仰賴自己辛勞自立，才能獲取成果。中年之時，運勢逐漸好轉，事業及財務收入都有上揚的趨勢，此時期所累積的財富，應以自己踏實努力所得為佳，而不要貪求不切實際的投資獲利或他人之物。晚年運勢平順，生活豐足無憂，可以說是財利富足的命格。", "二十九日出生之人，個性忠厚老實，處事踏實守信，也較能辛勤勞作，不好高騖遠，謀求投機獲利。由於性格中具備俠義特質，使這一天出生的男女多半慷慨大方、樂於助人，而能遊走各領域、階層，廣受眾人喜愛。此日出生的男性，妻子多半具有財富，且善於經營，夫妻生活因而得以安適無憂。整體大運方面：早年運勢較為平順，學業及事業發展雖無大進展，卻也沒有大災大難。中年以後運勢開始亨通，財務收入水漲船高，及至晚年運勢更為強盛，而能有餘力及福蔭庇佑子孫，是屬於幸福富裕的命格。", "三十日出生之人，天資聰明伶俐，個性正直不偏倚，為人向來以活潑開朗著稱。處事方面，態度明快爽利，常為幫助他人而犧牲自己的權益，因此被人視為好好先生。整體運勢方面︰三十日出生者，天生運勢強盛，少年時期學業表現良好，日常生活上也少有煩憂；中年之時運勢持續上漲，事業發展穩當且少有煩憂困擾；晚年以後運勢更見昌隆興盛，財利及事業聲名輝煌，而能享有名利雙收的晚年生活，可以說是屬於興盛大旺的命格。"];
+
+  var form = document.getElementById("form");
+  var select = document.getElementById("day");
+  var result = document.getElementById("result");
+  var empty = document.getElementById("empty");
+  var content = document.getElementById("content");
+  var badge = document.getElementById("badge");
+  var title = document.getElementById("result-title");
+  var body = document.getElementById("result-text");
+
+  DAYS.forEach(function (day, index) {
+    var option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = day + "出生之人";
+    select.appendChild(option);
+  });
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    var index = parseInt(select.value, 10);
+    if (!Number.isInteger(index) || index < 0 || index >= DAYS.length) {
+      return;
+    }
+
+    var day = DAYS[index];
+    badge.textContent = "你是" + day + "出生的人哦！";
+    title.textContent = day + "出生之人";
+    body.textContent = FORTUNES[index];
+
+    empty.hidden = true;
+    content.hidden = false;
+    content.classList.remove("show");
+    void content.offsetWidth;
+    content.classList.add("show");
+
+    if (window.matchMedia("(max-width: 640px)").matches) {
+      result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  });
+})();
+</script>
+</body>
+</html>
