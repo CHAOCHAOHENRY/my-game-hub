@@ -1001,6 +1001,8 @@ var titleBgSrc = TITLE_BG_LIST[(Math.random() * TITLE_BG_LIST.length) | 0];
 var preloadCount = 0;
 var totalAssets = 0;
 var loadingFinished = false;
+// 预加载后保留 Image 对象：浏览器的解码位图会随对象存活，出牌时可立刻绘制，不会一张张慢慢刷
+var cardImgCache = {};
 
 function enterMenuDirect() {
     document.getElementById('loading-screen').classList.add('hidden');
@@ -1008,7 +1010,7 @@ function enterMenuDirect() {
     document.getElementById('screen-menu').style.display = 'flex';
 }
 
-function preloadAssets() {
+function preloadAssets(showLoadingScreen) {
     var suits = ['c','h','s','d'];
     var ranks = ['4','5','6','7','8','9','10','J','Q','K','A','2','3'];
     
@@ -1032,6 +1034,8 @@ function preloadAssets() {
         if (assetsReady) {
             try { localStorage.setItem('ddzAssetVersion', ASSET_VERSION); } catch(e) {}
         }
+        // 资源已缓存过时不显示加载页，后台静默预热即可，开场动画照常播放
+        if (showLoadingScreen === false) return;
         document.getElementById('loading-screen').classList.add('hidden');
         startTitleAnimation();
     }
@@ -1048,9 +1052,20 @@ function preloadAssets() {
     
     imgList.forEach(src => {
         var img = new Image();
-        img.onload = updateProgress;
-        img.onerror = updateProgress;
         img.decoding = 'async';
+        var keep = function () {
+            cardImgCache[src] = img;
+            updateProgress();
+        };
+        img.onload = function () {
+            // 加载时就把位图解码好，出牌区直接复用，不用等解码
+            if (img.decode) img.decode().then(keep, keep);
+            else keep();
+        };
+        img.onerror = function () {
+            cardImgCache[src] = img;
+            updateProgress();
+        };
         img.src = src;
     });
     
@@ -2353,6 +2368,8 @@ function solo_settle(g) {
 }
 
 function start_new_game_solo() {
+    selectedIds = {}; selectedCount = 0;
+    handDrag.el = null; handDrag.pointerId = null; handDrag.active = false; handDrag.suppressClick = false;
     handOrderIds = [];
         // 🔥 随机三个电脑名字（同一轮单机模式内保持不变，累计分会正常继承）
     if (!soloAINames || soloAINames.length < 3) pickSoloAINames();
@@ -3243,26 +3260,29 @@ function setSeatBox(box, plateHtml, plateSig, isTurn, backCount) {
     if (box.className !== cls) box.className = cls;
 }
 
-// 出牌区：先在新容器里解码好图片，再整体替换，旧牌面保留到新牌面可显示为止
+// 出牌区：优先复用开机时已解码的牌图，立即整组显示；缺图时才等加载/解码
 function setTrickCards(el, cards) {
     var sig = (cards && cards.length) ? cards.map(function(c){ return c.id; }).join(',') : '';
     if (el._trickSig === sig) return;
     el._trickSig = sig;
+    var token = (el._trickToken || 0) + 1;
+    el._trickToken = token;
     if (!sig) { el.innerHTML = ''; return; }
 
     var wrap = document.createElement('div');
     wrap.className = 'trick-cards';
-    var imgs = [];
+    var pending = [];
     cards.forEach(function(c){
-        var im = new Image();
-        im.decoding = 'async';
-        im.src = img(c.id);
+        var src = img(c.id);
+        var im = cardImgCache[src];
+        if (!im) {
+            im = new Image();
+            im.src = src;
+            pending.push(im);
+        }
         wrap.appendChild(im);
-        imgs.push(im);
     });
 
-    var token = (el._trickToken || 0) + 1;
-    el._trickToken = token;
     var done = false;
     function swap() {
         if (done || el._trickToken !== token) return;
@@ -3270,12 +3290,10 @@ function setTrickCards(el, cards) {
         el.innerHTML = '';
         el.appendChild(wrap);
     }
-    var pending = imgs.length;
-    function oneDone() {
-        pending--;
-        if (pending <= 0) swap();
-    }
-    imgs.forEach(function(im){
+    if (!pending.length) { swap(); return; }
+    var left = pending.length;
+    function oneDone() { if (--left <= 0) swap(); }
+    pending.forEach(function(im){
         if (im.decode) {
             im.decode().then(oneDone, oneDone);
         } else if (im.complete) {
@@ -3372,8 +3390,10 @@ document.addEventListener("DOMContentLoaded", () => {
     try { cachedAssetVer = localStorage.getItem('ddzAssetVersion'); } catch(e) {}
     if (cachedAssetVer === ASSET_VERSION) {
         startTitleAnimation();
+        // 仍要在开机时把 52 张牌图解码好，否则出牌时又会一张张现读
+        preloadAssets(false);
     } else {
-        preloadAssets();
+        preloadAssets(true);
     }
     var lastUser = null;
     try { lastUser = localStorage.getItem('lastUser'); } catch(e) {}
