@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#06040f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>烛影塔罗 · 三牌启示</title>
+<style>
+  :root{
+    --bg:#06040f;
+    --gold:#e7c270;
+    --gold-hi:#f9e9b8;
+    --gold-deep:#a97b2c;
+    --ink:#f4eee2;
+    --muted:#a79fbe;
+    --rose:#e2a0b7;
+    --line:rgba(231,194,112,.22);
+    --panel:rgba(20,14,36,.72);
+    --serif:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC","SimSun",serif;
+    --sans:"PingFang SC","Microsoft YaHei","Noto Sans SC","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  html{background:var(--bg)}
+  body{
+    min-height:100dvh;color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;
+    background:
+      radial-gradient(820px 560px at 12% -10%,rgba(84,58,158,.30),transparent 66%),
+      radial-gradient(700px 520px at 92% 8%,rgba(176,104,80,.14),transparent 62%),
+      radial-gradient(900px 700px at 50% 112%,rgba(26,80,132,.20),transparent 66%),
+      linear-gradient(180deg,#080513,#06040f 46%,#04030a);
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  }
+  button{font-family:inherit;color:inherit}
+  #stars{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+  #fx{position:fixed;inset:0;z-index:60;pointer-events:none}
+  .veil{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(ellipse 74% 58% at 50% 44%,transparent 34%,rgba(3,2,8,.5) 78%,rgba(2,1,5,.86) 100%);
+  }
+  #app{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
+
+  /* ---------- 音效开关 ---------- */
+  .sound-toggle{
+    position:fixed;right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));
+    width:40px;height:40px;border-radius:50%;z-index:70;cursor:pointer;
+    display:grid;place-items:center;
+    border:1px solid rgba(231,194,112,.26);background:rgba(12,8,24,.6);
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+    color:#e9d6a4;transition:border-color .25s,transform .2s,background .25s;
+  }
+  .sound-toggle:hover{border-color:rgba(231,194,112,.6);background:rgba(24,16,42,.8)}
+  .sound-toggle:active{transform:scale(.94)}
+  .sound-toggle svg{width:19px;height:19px;display:block}
+  .sound-toggle .slash{display:none}
+  .sound-toggle.muted .slash{display:block}
+  .sound-toggle.muted{color:#7d7595}
+
+  /* ---------- 屏幕切换 ---------- */
+  .screen{display:none}
+  .screen.active{display:flex;min-height:100vh;min-height:100dvh;animation:screenIn .8s ease both}
+  @keyframes screenIn{from{opacity:0}to{opacity:1}}
+
+  /* ---------- 开场 ---------- */
+  #intro{flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    padding:calc(56px + env(safe-area-inset-top)) 22px calc(40px + env(safe-area-inset-bottom));}
+  .intro-inner{position:relative;width:min(560px,100%)}
+  .eyebrow{font-size:.68rem;letter-spacing:.58em;text-indent:.58em;color:#8f87a8;text-transform:uppercase;margin-bottom:22px}
+  h1{
+    font-family:var(--serif);font-weight:600;margin:0;line-height:1.08;
+    font-size:clamp(46px,13.5vw,82px);letter-spacing:.14em;text-indent:.14em;
+    background:linear-gradient(150deg,#fffdf4 0%,#f8e8b6 38%,#d8ab55 72%,#f3dca2 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 12px 34px rgba(231,194,112,.16));
+  }
+  .halo-ring{
+    position:absolute;left:50%;top:clamp(52px,10vw,86px);width:clamp(230px,64vw,380px);height:clamp(230px,64vw,380px);
+    margin-left:calc(clamp(230px,64vw,380px) / -2);margin-top:calc(clamp(230px,64vw,380px) / -2);
+    border:1px dashed rgba(231,194,112,.20);border-radius:50%;pointer-events:none;
+    animation:ringTurn 44s linear infinite;
+  }
+  .halo-ring::before{content:"";position:absolute;inset:16px;border-radius:50%;border:1px solid rgba(231,194,112,.08)}
+  @keyframes ringTurn{to{transform:rotate(360deg)}}
+  .ornament{display:flex;align-items:center;justify-content:center;gap:12px;margin:26px 0 24px;color:var(--gold)}
+  .ornament i{display:block;width:clamp(46px,14vw,86px);height:1px;background:linear-gradient(90deg,transparent,rgba(231,194,112,.7))}
+  .ornament i:last-child{background:linear-gradient(90deg,rgba(231,194,112,.7),transparent)}
+  .ornament b{font-size:11px;font-weight:400;transform:rotate(45deg);width:7px;height:7px;background:var(--gold);box-shadow:0 0 14px rgba(231,194,112,.75)}
+  .lede{margin:0 auto;color:#b6aecb;font-size:clamp(.94rem,2.8vw,1.06rem);line-height:2;letter-spacing:.06em;max-width:26em}
+  .themes{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:clamp(28px,6vh,46px) auto 0;max-width:420px}
+  .theme{
+    padding:11px 4px;border-radius:12px;cursor:pointer;
+    border:1px solid rgba(167,159,190,.22);background:rgba(255,255,255,.025);
+    color:#bdb5d2;font-size:.9rem;letter-spacing:.16em;text-indent:.16em;
+    transition:border-color .25s,color .25s,background .25s,transform .2s;
+  }
+  .theme:hover{border-color:rgba(231,194,112,.45);color:#f2e3bb;background:rgba(231,194,112,.06)}
+  .theme.active{
+    border-color:rgba(231,194,112,.72);color:#2a1d05;
+    background:linear-gradient(140deg,#f7e5ab,#e7c270 55%,#cfa246);
+    box-shadow:0 8px 26px rgba(214,167,66,.22),inset 0 1px 0 rgba(255,255,255,.5);
+    font-weight:700;
+  }
+  .btn-primary{
+    margin-top:clamp(28px,5vh,42px);height:56px;padding:0 42px;border:0;border-radius:999px;cursor:pointer;
+    font-size:1rem;font-weight:700;letter-spacing:.22em;text-indent:.22em;color:#241803;
+    background:linear-gradient(135deg,#f9e9bb 0%,#e8c56a 48%,#cfa245 100%);
+    box-shadow:0 16px 38px rgba(214,167,66,.26),inset 0 1px 0 rgba(255,255,255,.6);
+    transition:transform .2s,box-shadow .2s,filter .2s;
+  }
+  .btn-primary:hover{transform:translateY(-2px);filter:brightness(1.04);box-shadow:0 20px 46px rgba(214,167,66,.34),inset 0 1px 0 rgba(255,255,255,.65)}
+  .btn-primary:active{transform:translateY(0) scale(.99)}
+  .hint{margin:18px 0 0;color:#726a8b;font-size:.76rem;letter-spacing:.14em}
+  .intro-foot{margin-top:clamp(34px,7vh,64px);color:#5d5677;font-size:.72rem;letter-spacing:.12em}
+
+  /* ---------- 占卜桌 ---------- */
+  #table{flex-direction:column;padding:calc(10px + env(safe-area-inset-top)) 16px calc(26px + env(safe-area-inset-bottom))}
+  .table-head{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    width:100%;max-width:760px;margin:0 auto;min-height:44px;padding-right:44px;
+  }
+  .btn-ghost{
+    border:1px solid rgba(167,159,190,.22);background:rgba(255,255,255,.02);color:#a9a1c0;
+    padding:8px 14px;border-radius:999px;font-size:.78rem;letter-spacing:.12em;cursor:pointer;
+    transition:border-color .25s,color .25s;white-space:nowrap;
+  }
+  .btn-ghost:hover{border-color:rgba(231,194,112,.5);color:#f1e0b5}
+  .theme-tag{
+    font-family:var(--serif);font-size:.82rem;letter-spacing:.28em;text-indent:.28em;color:#e8d5a2;
+    border-bottom:1px solid rgba(231,194,112,.28);padding-bottom:3px;white-space:nowrap;
+  }
+  .stage{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    width:100%;max-width:760px;margin:0 auto;gap:clamp(16px,3vh,30px);
+    padding:clamp(12px,3vh,32px) 0 clamp(4px,1.6vh,16px);
+  }
+  .slots{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(8px,2.2vw,18px);width:min(640px,100%);margin:0 auto}
+  .slot{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+  .slot-cap{
+    display:flex;align-items:center;gap:6px;color:#9a92b3;font-size:clamp(.66rem,2.4vw,.78rem);
+    letter-spacing:.2em;text-indent:.2em;white-space:nowrap;
+  }
+  .slot-cap .num{font-family:var(--serif);color:rgba(231,194,112,.7);font-size:.72em;letter-spacing:0}
+  .slot-frame{
+    position:relative;width:100%;aspect-ratio:400 / 597;border-radius:clamp(8px,1.8vw,12px);
+    transition:box-shadow .4s;
+  }
+  .slot-empty{
+    position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    border:1px dashed rgba(231,194,112,.20);
+    background:linear-gradient(160deg,rgba(231,194,112,.035),rgba(255,255,255,.012));
+    display:grid;place-items:center;color:rgba(231,194,112,.24);
+    transition:opacity .5s,border-color .4s,background .4s;
+  }
+  .slot-empty svg{width:22%;height:auto;opacity:.8}
+  .slot.hot .slot-empty{border-color:rgba(231,194,112,.85);background:radial-gradient(circle at 50% 60%,rgba(231,194,112,.16),rgba(231,194,112,.03) 70%);box-shadow:0 0 34px rgba(231,194,112,.18)}
+  .slot-frame.has-card .slot-empty{opacity:0}
+  .slot-name{
+    min-height:2.1em;text-align:center;font-size:clamp(.72rem,2.5vw,.84rem);line-height:1.4;
+    opacity:0;transform:translateY(6px);transition:opacity .6s,transform .6s;
+  }
+  .slot-name.show{opacity:1;transform:none}
+  .slot-name b{font-family:var(--serif);font-weight:600;color:#f3e5bd;letter-spacing:.08em;display:block}
+  .slot-name em{font-style:normal;font-size:.78em;letter-spacing:.18em;color:#9d94b6}
+  .slot-name em.r{color:var(--rose)}
+  .tip{
+    min-height:1.5em;margin:0;text-align:center;color:#a49cbe;font-size:clamp(.76rem,2.5vw,.86rem);
+    letter-spacing:.14em;transition:color .4s;
+  }
+  .tip.gold{color:#e9d29a}
+
+  /* ---------- 牌堆 ---------- */
+  .deck-area{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:clamp(10px,2vh,22px)}
+  .deck-area::before{
+    content:"";position:absolute;left:50%;top:50%;width:190%;height:150%;transform:translate(-50%,-50%);
+    background:radial-gradient(ellipse at 50% 55%,rgba(231,194,112,.13),transparent 62%);
+    pointer-events:none;filter:blur(8px);
+  }
+  .deck{
+    position:relative;width:clamp(96px,25vw,152px);aspect-ratio:400 / 597;
+    cursor:grab;touch-action:none;outline:none;
+    transition:transform .25s ease;
+  }
+  .deck:active{cursor:grabbing}
+  .deck.drawing{transform:scale(.965)}
+  .deck:focus-visible{box-shadow:0 0 0 2px rgba(231,194,112,.55);border-radius:10px}
+  .deck.disabled{cursor:default;filter:saturate(.7) brightness(.78)}
+  .deck-layer{
+    position:absolute;inset:0;pointer-events:none;
+    transform:translate(calc(var(--i) * 1.15px), calc(var(--i) * -1.35px)) rotate(calc((var(--i) - 7.5) * .32deg));
+    transition:transform .5s cubic-bezier(.2,.8,.25,1);
+  }
+  .deck-top{animation:deckBreathe 4.6s ease-in-out infinite}
+  @keyframes deckBreathe{
+    0%,100%{transform:translate(17px,-20px) rotate(2.4deg)}
+    50%{transform:translate(17px,-26px) rotate(2.4deg) scale(1.025)}
+  }
+  .deck.shuffling .deck-layer{animation:deckShuffle .46s ease-in-out infinite alternate}
+  .deck.shuffling .deck-layer:nth-child(2n){animation-direction:alternate-reverse}
+  @keyframes deckShuffle{
+    from{transform:translate(-7px,-6px) rotate(-7deg)}
+    to{transform:translate(9px,-12px) rotate(8deg)}
+  }
+  .deck-hint{color:#766e8f;font-size:.72rem;letter-spacing:.2em;text-indent:.2em;white-space:nowrap}
+  .deck-hint.lit{color:#d9c187}
+
+  /* ---------- 牌背 / 牌面 ---------- */
+  .card-back{
+    position:absolute;inset:0;border-radius:inherit;overflow:hidden;color:#d9b76a;
+    background:
+      radial-gradient(130% 96% at 50% -6%,#3a2256 0%,#221338 38%,#120a20 74%,#0a0514 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(231,194,112,.52),
+      inset 0 0 0 4px rgba(9,5,17,.92),
+      inset 0 0 0 5px rgba(231,194,112,.24),
+      0 14px 28px rgba(0,0,0,.5);
+  }
+  .card-back::before{
+    content:"";position:absolute;inset:0;opacity:.55;
+    background-image:radial-gradient(circle,rgba(231,194,112,.16) 1px,transparent 1.3px);
+    background-size:13px 13px;
+    -webkit-mask-image:radial-gradient(ellipse at 50% 50%,#000 30%,transparent 76%);
+    mask-image:radial-gradient(ellipse at 50% 50%,#000 30%,transparent 76%);
+  }
+  .card-back::after{
+    content:"";position:absolute;inset:-40% -80%;pointer-events:none;
+    background:linear-gradient(105deg,transparent 42%,rgba(255,240,198,.10) 48%,rgba(255,240,198,.02) 54%,transparent 60%);
+    transform:translateX(-40%);animation:backSheen 7s ease-in-out infinite;
+  }
+  @keyframes backSheen{0%,55%{transform:translateX(-55%)}85%,100%{transform:translateX(55%)}}
+  .bk-art{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .bk-brand{
+    position:absolute;left:0;right:0;bottom:7.5%;text-align:center;
+    font-family:var(--serif);font-size:clamp(6px,1.6vw,9px);letter-spacing:.42em;text-indent:.42em;
+    color:rgba(231,194,112,.55);
+  }
+  .face{
+    position:absolute;inset:0;border-radius:inherit;overflow:hidden;
+    -webkit-backface-visibility:hidden;backface-visibility:hidden;
+  }
+  .face-back{transform:rotateY(0deg)}
+  .face-front{transform:rotateY(180deg);background:#0b0614}
+  .face-front img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;-webkit-user-drag:none}
+  .face-front.rev img{transform:rotate(180deg)}
+  .face-front::after{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    box-shadow:inset 0 0 0 1px rgba(255,235,180,.34),inset 0 0 22px rgba(0,0,0,.4);
+  }
+
+  /* ---------- 卡槽里的 3D 牌 ---------- */
+  .card3d{
+    position:absolute;inset:0;border-radius:inherit;perspective:1300px;
+    touch-action:none;cursor:grab;outline:none;
+    --p:0;--ry:0deg;--ty:0px;
+  }
+  .card3d:active{cursor:grabbing}
+  .card3d.revealed{cursor:default}
+  .card3d .inner{
+    position:relative;width:100%;height:100%;transform-style:preserve-3d;
+    transform:rotateY(var(--ry)) translateY(var(--ty));
+    transition:transform 1s cubic-bezier(.22,.78,.2,1);
+    will-change:transform;
+  }
+  .card3d.dragging .inner{transition:none}
+  .card3d .halo{
+    position:absolute;inset:-12%;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle at 50% 50%,rgba(255,226,150,.34),rgba(255,206,108,.10) 42%,transparent 68%);
+    opacity:0;transition:opacity .3s;filter:blur(10px);
+  }
+  .card3d.opening .halo{opacity:calc(var(--p) * .95)}
+  .card3d .seam{
+    position:absolute;top:4%;bottom:4%;left:50%;width:2px;margin-left:-1px;pointer-events:none;
+    background:linear-gradient(180deg,transparent,rgba(255,238,190,.9) 24%,rgba(255,224,150,.9) 76%,transparent);
+    opacity:0;filter:blur(3px);z-index:3;
+  }
+  .card3d .seam{opacity:0}
+  .card3d .hand{
+    position:absolute;left:50%;bottom:-8%;width:46%;z-index:5;pointer-events:none;
+    opacity:0;transform:translate(-50%,80px) rotate(-16deg);
+    filter:drop-shadow(0 0 12px rgba(247,214,140,.38)) drop-shadow(0 6px 14px rgba(0,0,0,.65));
+    transition:opacity .35s ease;
+  }
+  .card3d.opening .hand{opacity:.94}
+  .card3d.revealed .hand{opacity:0}
+  .card3d .open-hint{
+    position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);white-space:nowrap;
+    font-size:.64rem;letter-spacing:.16em;color:#bdb2d0;opacity:0;transition:opacity .4s;
+    pointer-events:none;
+  }
+  .card3d.pending .open-hint{opacity:1;animation:hintPulse 2.4s ease-in-out infinite}
+  @keyframes hintPulse{0%,100%{opacity:.4}50%{opacity:.95}}
+  .card3d.revealed .open-hint{display:none}
+  .card3d.landed .inner{animation:landSettle .5s cubic-bezier(.2,.9,.3,1)}
+  @keyframes landSettle{0%{transform:rotateY(0) translateY(-8px) scale(1.05)}100%{transform:rotateY(0) translateY(0) scale(1)}}
+
+  /* ---------- 抽牌拖拽幽灵 ---------- */
+  .drag-card{
+    position:fixed;z-index:61;border-radius:10px;pointer-events:none;
+    will-change:transform;transform-origin:50% 78%;
+    box-shadow:0 26px 54px rgba(0,0,0,.62);
+  }
+  .spark{
+    position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;
+    background:#ffedb0;pointer-events:none;
+    animation:sparkFly 1.15s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  @keyframes sparkFly{
+    0%{transform:translate(-50%,-50%) scale(1);opacity:1}
+    100%{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(.2);opacity:0}
+  }
+
+  /* ---------- 解读区 ---------- */
+  .readings{width:100%;max-width:760px;margin:clamp(10px,2.5vh,26px) auto 0;display:flex;flex-direction:column;gap:14px}
+  .reading{
+    display:grid;grid-template-columns:74px 1fr;gap:16px;align-items:start;
+    padding:16px;border-radius:18px;
+    border:1px solid rgba(231,194,112,.16);
+    background:linear-gradient(155deg,rgba(30,20,52,.78),rgba(12,8,24,.86));
+    box-shadow:0 18px 44px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.04);
+    opacity:0;transform:translateY(16px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.8,.2,1);
+  }
+  .reading.in{opacity:1;transform:none}
+  .r-thumb{position:relative;border-radius:9px;overflow:hidden;aspect-ratio:400 / 597;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+  .r-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .r-thumb.rev img{transform:rotate(180deg)}
+  .r-top{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .r-pos{font-size:.68rem;letter-spacing:.26em;color:#9c93b7}
+  .r-ori{font-size:.64rem;letter-spacing:.16em;padding:2px 8px;border-radius:999px;border:1px solid rgba(231,194,112,.4);color:#ecd8a2;background:rgba(231,194,112,.08)}
+  .r-ori.r{border-color:rgba(226,160,183,.46);color:#eab4c6;background:rgba(226,160,183,.08)}
+  .reading h3{margin:0 0 4px;font-family:var(--serif);font-weight:600;font-size:1.24rem;letter-spacing:.1em;color:#f6e9c4}
+  .r-kw{font-size:.74rem;letter-spacing:.08em;color:#b9aed2;margin-bottom:8px;line-height:1.7}
+  .reading p{margin:0;font-size:.87rem;line-height:1.92;color:#c6bedb;text-align:justify}
+  .readings:empty::before{
+    content:"牌面翻开后，属于你的解读会在这里缓缓显现。";
+    display:block;text-align:center;color:#5f5877;font-size:.76rem;letter-spacing:.16em;padding:8px 0 4px;
+  }
+
+  /* ---------- 终局 ---------- */
+  .finale{margin:clamp(14px,3vh,30px) auto 0;width:100%;max-width:760px;display:none}
+  .finale.show{display:block;animation:rise .95s cubic-bezier(.16,.8,.24,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  .finale-card{
+    position:relative;overflow:hidden;border-radius:24px;padding:clamp(26px,5vw,44px);
+    border:1px solid rgba(231,194,112,.34);
+    background:
+      radial-gradient(700px 280px at 50% -16%,rgba(231,194,112,.14),transparent 70%),
+      linear-gradient(160deg,rgba(34,22,58,.92),rgba(11,7,22,.95));
+    box-shadow:0 30px 80px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.07);
+    text-align:center;
+  }
+  .finale-card::before{content:"";position:absolute;inset:9px;border:1px solid rgba(231,194,112,.14);border-radius:17px;pointer-events:none}
+  .seal{
+    display:inline-flex;align-items:center;gap:12px;color:#e9cd8b;
+    font-family:var(--serif);font-size:.8rem;letter-spacing:.4em;text-indent:.4em;
+  }
+  .seal::before,.seal::after{content:"";width:34px;height:1px;background:linear-gradient(90deg,transparent,rgba(231,194,112,.7))}
+  .seal::after{background:linear-gradient(90deg,rgba(231,194,112,.7),transparent)}
+  .finale h2{margin:14px 0 6px;font-family:var(--serif);font-weight:600;font-size:clamp(1.5rem,5vw,2.1rem);letter-spacing:.12em;
+    background:linear-gradient(120deg,#fffdf4,#f4e0a8 55%,#d8ab55);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .finale .cards-line{color:#9d94b6;font-size:.78rem;letter-spacing:.1em;line-height:1.9;margin-bottom:18px}
+  .finale .cards-line b{color:#e8d5a2;font-weight:500}
+  .finale .cards-line .cl{display:inline-block;white-space:nowrap}
+  .finale-text{margin:0 auto;max-width:36em;color:#d2cae4;font-size:clamp(.94rem,2.9vw,1.02rem);line-height:2.05;text-align:justify;text-align-last:center}
+  .finale-text .em{color:#f3dfa8}
+  .finale-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:clamp(22px,4vh,32px)}
+  .finale-actions button{height:48px;padding:0 26px;border-radius:999px;cursor:pointer;font-size:.84rem;letter-spacing:.16em;transition:transform .2s,filter .2s,border-color .25s,color .25s}
+  .finale-actions button:active{transform:scale(.97)}
+  .btn-gold{border:0;color:#241803;font-weight:700;background:linear-gradient(135deg,#f8e6b4,#e7c270 52%,#cfa245);box-shadow:0 12px 28px rgba(214,167,66,.24)}
+  .btn-gold:hover{filter:brightness(1.04)}
+  .disclaimer{text-align:center;color:#4f4965;font-size:.68rem;letter-spacing:.14em;margin:clamp(22px,4vh,38px) 0 8px}
+
+  /* ---------- 神谕解读浮层 ---------- */
+  body.locked{overflow:hidden}
+  .oracle{
+    position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+    padding:calc(18px + env(safe-area-inset-top)) 16px calc(18px + env(safe-area-inset-bottom));
+    background:rgba(3,2,8,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    opacity:0;visibility:hidden;transition:opacity .45s ease,visibility .45s;
+  }
+  .oracle.show{opacity:1;visibility:visible}
+  .oracle-box{
+    position:relative;width:min(700px,100%);max-height:88vh;max-height:88dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    border-radius:22px;border:1px solid rgba(231,194,112,.36);
+    background:
+      radial-gradient(680px 240px at 50% -10%,rgba(231,194,112,.14),transparent 70%),
+      linear-gradient(160deg,rgba(36,23,60,.97),rgba(10,6,20,.98));
+    box-shadow:0 40px 90px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.07);
+    transform:translateY(18px) scale(.97);opacity:0;
+    transition:transform .55s cubic-bezier(.18,.85,.22,1),opacity .5s ease;
+  }
+  .oracle.show .oracle-box{transform:none;opacity:1}
+  .oracle-box::before{content:"";position:absolute;inset:8px;border:1px solid rgba(231,194,112,.13);border-radius:16px;pointer-events:none}
+  .oracle-close{
+    position:absolute;right:12px;top:12px;z-index:3;width:36px;height:36px;border-radius:50%;cursor:pointer;
+    border:1px solid rgba(231,194,112,.28);background:rgba(10,6,20,.55);color:#d9c187;
+    display:grid;place-items:center;font-size:17px;line-height:1;
+  }
+  .oracle-close:hover{border-color:rgba(231,194,112,.65);color:#fff3cf}
+  .oracle-inner{display:grid;grid-template-columns:180px 1fr;gap:clamp(16px,3vw,28px);padding:clamp(20px,3.6vw,34px);position:relative;z-index:1;align-items:start}
+  .oracle-art{position:relative;border-radius:12px;overflow:hidden;aspect-ratio:400 / 597;box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 0 1px rgba(231,194,112,.3)}
+  .oracle-art img{width:100%;height:100%;object-fit:cover;display:block}
+  .oracle-art.rev img{transform:rotate(180deg)}
+  .oracle-art::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 26px rgba(0,0,0,.35);pointer-events:none}
+  .oracle-kicker{font-size:.68rem;letter-spacing:.34em;color:#9c93b7;margin-bottom:8px}
+  .oracle-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin:0 0 10px}
+  .oracle-title h2{
+    margin:0;font-family:var(--serif);font-weight:600;font-size:clamp(1.5rem,4.6vw,2rem);letter-spacing:.1em;
+    background:linear-gradient(120deg,#fffdf4,#f3dfa8 60%,#d8ab55);-webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .oracle-title em{font-style:normal;font-size:.66rem;letter-spacing:.18em;padding:3px 9px;border-radius:999px;
+    border:1px solid rgba(231,194,112,.42);color:#ecd8a2;background:rgba(231,194,112,.08)}
+  .oracle-title em.r{border-color:rgba(226,160,183,.48);color:#eab4c6;background:rgba(226,160,183,.08)}
+  .oracle-kw{color:#c0b3db;font-size:.78rem;letter-spacing:.1em;line-height:1.8;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:12px}
+  .oracle-text{margin:0;font-size:.92rem;line-height:2;color:#d4cce6;text-align:justify;text-justify:inter-ideograph}
+  .oracle-btn{
+    margin-top:18px;height:46px;padding:0 26px;border:0;border-radius:999px;cursor:pointer;
+    font-size:.86rem;font-weight:700;letter-spacing:.18em;color:#241803;
+    background:linear-gradient(135deg,#f8e6b4,#e7c270 52%,#cfa245);
+    box-shadow:0 12px 28px rgba(214,167,66,.22);
+    transition:transform .2s,filter .2s;
+  }
+  .oracle-btn:hover{filter:brightness(1.04)}
+  .oracle-btn:active{transform:scale(.97)}
+  @media (max-width:600px){
+    .oracle-inner{grid-template-columns:1fr;gap:16px;padding:18px;padding-top:48px}
+    .oracle-art{width:min(46vw,168px);margin:0 auto}
+    .oracle-title{justify-content:center;text-align:center}
+    .oracle-kicker{text-align:center}
+    .oracle-kw{text-align:center}
+    .oracle-text{font-size:.88rem;line-height:1.92}
+    .oracle-btn{display:block;width:100%;margin-top:16px}
+  }
+
+  @media (max-width:520px){
+    #table{padding-left:12px;padding-right:12px}
+    .reading{grid-template-columns:60px 1fr;gap:13px;padding:14px}
+    .reading h3{font-size:1.1rem}
+    .reading p{font-size:.83rem;line-height:1.86}
+    .slot-name{min-height:2.3em}
+    .deck-area{margin-top:0}
+    .card3d .open-hint{display:none}
+  }
+  @media (max-height:640px){
+    #intro{padding-top:32px;padding-bottom:24px}
+    .ornament{margin:16px 0}
+    .themes{margin-top:18px}
+    .btn-primary{margin-top:20px}
+    .intro-foot{margin-top:22px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  }
+</style>
+</head>
+<body>
+<canvas id="stars" aria-hidden="true"></canvas>
+<div class="veil" aria-hidden="true"></div>
+<div id="fx" aria-hidden="true"></div>
+
+<button class="sound-toggle" id="soundBtn" aria-label="开关音效" aria-pressed="true">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M11 5 6.5 9H3v6h3.5L11 19V5z"/>
+    <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+    <path class="slash" d="M4 3l16 18"/>
+  </svg>
+</button>
+
+<div id="app">
+  <!-- ================= 开场 ================= -->
+  <section class="screen active" id="intro">
+    <div class="intro-inner">
+      <div class="halo-ring" aria-hidden="true"></div>
+      <div class="eyebrow">Candlelit Tarot</div>
+      <h1>烛影塔罗</h1>
+      <div class="ornament" aria-hidden="true"><i></i><b></b><i></i></div>
+      <p class="lede">三张牌，照见你此刻的命运。<br>静下心来，选一个想问的方向。</p>
+      <div class="themes" id="themes" role="radiogroup" aria-label="占卜主题">
+        <button class="theme active" data-theme="general" role="radio" aria-checked="true">综合</button>
+        <button class="theme" data-theme="love" role="radio" aria-checked="false">爱情</button>
+        <button class="theme" data-theme="career" role="radio" aria-checked="false">事业</button>
+        <button class="theme" data-theme="wealth" role="radio" aria-checked="false">财运</button>
+        <button class="theme" data-theme="study" role="radio" aria-checked="false">学业</button>
+        <button class="theme" data-theme="health" role="radio" aria-checked="false">健康</button>
+      </div>
+      <button class="btn-primary" id="startBtn">洗牌 · 开始占卜</button>
+      <p class="hint">在安静之处，心中默念你的问题</p>
+    </div>
+    <p class="intro-foot">过去 · 现在 · 未来</p>
+  </section>
+
+  <!-- ================= 占卜桌 ================= -->
+  <section class="screen" id="table">
+    <header class="table-head">
+      <button class="btn-ghost" id="backBtn">‹ 换个问题</button>
+      <div class="theme-tag" id="themeTag">综合 · 三牌</div>
+    </header>
+
+    <div class="stage">
+      <div class="slots" id="slots"></div>
+      <p class="tip" id="tip">洗牌中，请心中默念你的问题…</p>
+      <div class="deck-area">
+        <div class="deck" id="deck" role="button" tabindex="0" aria-label="抽一张塔罗牌"></div>
+        <div class="deck-hint" id="deckHint">轻触 · 抽一张牌</div>
+      </div>
+    </div>
+
+    <section class="readings" id="readings" aria-live="polite"></section>
+    <section class="finale" id="finale" aria-live="polite"></section>
+    <p class="disclaimer">塔罗不预言结局，它照亮你此刻的选择 · 仅供娱乐与自我探索</p>
+  </section>
+</div>
+
+<!-- ================= 神谕解读 ================= -->
+<div class="oracle" id="oracle" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="oracleName">
+  <div class="oracle-box">
+    <button class="oracle-close" id="oracleClose" aria-label="收起解读">×</button>
+    <div class="oracle-inner">
+      <div class="oracle-art" id="oracleArt"><img id="oracleImg" src="" alt=""></div>
+      <div class="oracle-body">
+        <div class="oracle-kicker" id="oracleKicker"></div>
+        <div class="oracle-title"><h2 id="oracleName"></h2><em id="oracleOri"></em></div>
+        <div class="oracle-kw" id="oracleKw"></div>
+        <p class="oracle-text" id="oracleText"></p>
+        <button class="oracle-btn" id="oracleBtn">收下这张牌</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="tarot_data.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  var META = window.TAROT_META || [];
+  var POS = ['过去', '现在', '未来'];
+  var NUM = ['Ⅰ', 'Ⅱ', 'Ⅲ'];
+  var THEMES = {
+    general: { label: '综合', tail: '此刻的整体能量正在提醒你：先把注意力收回到自己身上，答案会在安静里浮现。' },
+    love:    { label: '爱情', tail: '感情里不必急着要一个结果，先看清自己真正需要什么，再决定靠近或后退。' },
+    career:  { label: '事业', tail: '事业上，先把能掌控的那一步做好；机会不会凭空出现，它藏在你的下一次行动里。' },
+    wealth:  { label: '财运', tail: '财运上宜稳不宜赌，守好现金流，比追逐一夜暴富更接近你想要的安全感。' },
+    study:   { label: '学业', tail: '学业上，慢一点没有关系，把模糊的地方一个个弄懂，进度自然会追上来。' },
+    health:  { label: '健康', tail: '身体比情绪更诚实，先睡好、吃好、走一走，很多困扰会跟着松动。' }
+  };
+
+  var S = {
+    theme: 'general',
+    deck: [],
+    slots: [null, null, null],
+    busy: true,
+    shuffled: false,
+    muted: false
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+  var intro = $('intro'), table = $('table');
+  var slotsEl = $('slots'), readingsEl = $('readings'), finaleEl = $('finale');
+  var deck = $('deck'), tipEl = $('tip'), deckHint = $('deckHint');
+  var themeTag = $('themeTag'), soundBtn = $('soundBtn');
+  var fx = $('fx');
+  var oracle = $('oracle'), oracleArt = $('oracleArt'), oracleImg = $('oracleImg');
+  var oracleKicker = $('oracleKicker'), oracleName = $('oracleName'), oracleOri = $('oracleOri');
+  var oracleKw = $('oracleKw'), oracleText = $('oracleText'), oracleBtn = $('oracleBtn');
+  var finaleOpen = false;
+
+  try { S.muted = localStorage.getItem('tarot_mute') === '1'; } catch(e) {}
+
+  /* ============ 星空背景 ============ */
+  (function(){
+    var canvas = $('stars'), ctx = canvas.getContext('2d');
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var stars = [], W = 0, H = 0, shoot = null, nextShoot = performance.now() + 4200;
+
+    function resize(){
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var n = Math.min(170, Math.round(W * H / 12000));
+      stars = [];
+      for (var i = 0; i < n; i++) {
+        stars.push({
+          x: Math.random() * W, y: Math.random() * H,
+          r: Math.random() * 1.2 + .3,
+          a: Math.random() * .5 + .16,
+          s: Math.random() * .016 + .004,
+          p: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    function frame(now){
+      ctx.clearRect(0, 0, W, H);
+      for (var i = 0; i < stars.length; i++) {
+        var st = stars[i];
+        st.p += st.s;
+        var a = st.a * (.6 + .4 * Math.sin(st.p));
+        ctx.beginPath();
+        ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(220,226,255,' + a.toFixed(3) + ')';
+        ctx.fill();
+      }
+      if (!reduce) {
+        if (!shoot && now > nextShoot) {
+          shoot = { x: Math.random() * W * .55, y: Math.random() * H * .3, vx: 5 + Math.random() * 3, vy: 2.4 + Math.random() * 1.6, life: 0, max: 46 };
+          nextShoot = now + 9000 + Math.random() * 9000;
+        }
+        if (shoot) {
+          shoot.x += shoot.vx; shoot.y += shoot.vy; shoot.life++;
+          var alpha = Math.max(0, 1 - shoot.life / shoot.max) * .7;
+          var g = ctx.createLinearGradient(shoot.x, shoot.y, shoot.x - shoot.vx * 9, shoot.y - shoot.vy * 9);
+          g.addColorStop(0, 'rgba(255,244,205,' + alpha + ')');
+          g.addColorStop(1, 'rgba(255,244,205,0)');
+          ctx.strokeStyle = g; ctx.lineWidth = 1.3; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(shoot.x, shoot.y);
+          ctx.lineTo(shoot.x - shoot.vx * 9, shoot.y - shoot.vy * 9); ctx.stroke();
+          if (shoot.life >= shoot.max) shoot = null;
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    requestAnimationFrame(frame);
+  })();
+
+  /* ============ 音效（WebAudio 合成） ============ */
+  var AC = null, noiseBuf = null, lastRub = 0;
+
+  function audioInit(){
+    if (S.muted) return null;
+    try {
+      if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+      if (AC.state === 'suspended') AC.resume();
+      return AC;
+    } catch(e) { return null; }
+  }
+  function noiseSource(){
+    if (!noiseBuf) {
+      noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    var src = AC.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    return src;
+  }
+  function whoosh(dur, peak, f1, f2){
+    var c = audioInit(); if (!c) return;
+    var t = c.currentTime;
+    var src = noiseSource();
+    var bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = .9;
+    bp.frequency.setValueAtTime(f1, t);
+    bp.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    var g = c.createGain();
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + dur * .35);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    src.connect(bp).connect(g).connect(c.destination);
+    src.start(t); src.stop(t + dur + .05);
+  }
+  function bell(){
+    var c = audioInit(); if (!c) return;
+    var t = c.currentTime;
+    var freqs = [523.25, 659.25, 783.99, 1046.5];
+    for (var i = 0; i < freqs.length; i++) {
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = freqs[i];
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(.085 / (i + 1), t + .02);
+      g.gain.exponentialRampToValueAtTime(.0001, t + 2.2);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t + 2.3);
+    }
+    whoosh(.9, .025, 3200, 6400);
+  }
+  function thump(){
+    var c = audioInit(); if (!c) return;
+    var t = c.currentTime;
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(52, t + .22);
+    g.gain.setValueAtTime(.16, t);
+    g.gain.exponentialRampToValueAtTime(.0001, t + .3);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t + .32);
+  }
+  function rub(intensity){
+    if (performance.now() - lastRub < 80) return;
+    lastRub = performance.now();
+    var c = audioInit(); if (!c) return;
+    var t = c.currentTime;
+    var src = noiseSource();
+    var hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1700;
+    var g = c.createGain();
+    g.gain.setValueAtTime(Math.min(.04, intensity * .05), t);
+    g.gain.exponentialRampToValueAtTime(.0001, t + .09);
+    src.connect(hp).connect(g).connect(c.destination);
+    src.start(t); src.stop(t + .1);
+  }
+  function sfxShuffle(){
+    if (S.muted) return;
+    for (var i = 0; i < 5; i++) {
+      (function(k){
+        setTimeout(function(){ whoosh(.26, .07, 500 + k * 160, 1500 + k * 220); }, k * 170);
+      })(i);
+    }
+    setTimeout(thump, 120);
+  }
+
+  function updateSoundBtn(){
+    soundBtn.classList.toggle('muted', S.muted);
+    soundBtn.setAttribute('aria-pressed', String(!S.muted));
+  }
+  updateSoundBtn();
+  soundBtn.addEventListener('click', function(){
+    S.muted = !S.muted;
+    try { localStorage.setItem('tarot_mute', S.muted ? '1' : '0'); } catch(e) {}
+    updateSoundBtn();
+    if (!S.muted) { audioInit(); whoosh(.18, .06, 800, 1600); }
+  });
+
+  /* ============ 牌背 ============ */
+  function backHTML(){
+    return '<div class="card-back">' +
+      '<svg class="bk-art" viewBox="0 0 100 150" aria-hidden="true">' +
+        '<rect x="6.5" y="6.5" width="87" height="137" rx="7" fill="none" stroke="currentColor" stroke-width=".8" opacity=".5"/>' +
+        '<rect x="10.5" y="10.5" width="79" height="129" rx="4.5" fill="none" stroke="currentColor" stroke-width=".45" opacity=".32"/>' +
+        '<circle cx="50" cy="72" r="23" fill="none" stroke="currentColor" stroke-width=".7" opacity=".55"/>' +
+        '<circle cx="50" cy="72" r="16" fill="none" stroke="currentColor" stroke-width=".45" opacity=".38" stroke-dasharray="1.4 3.2"/>' +
+        '<path d="M50 48v48M26 72h48M35 57l30 30M65 57 35 87" stroke="currentColor" stroke-width=".4" opacity=".24"/>' +
+        '<path d="M50 59a14 14 0 1 0 0 26 11 11 0 1 1 0-26z" fill="currentColor" opacity=".7"/>' +
+        '<path d="M50 26l1.7 4.6L56.3 32l-4.6 1.4L50 38l-1.7-4.6L43.7 32l4.6-1.4z" fill="currentColor" opacity=".8"/>' +
+        '<path d="M50 106l1.4 3.9 3.9 1.1-3.9 1.2L50 116l-1.4-3.8-3.9-1.2 3.9-1.1z" fill="currentColor" opacity=".6"/>' +
+        '<circle cx="18" cy="72" r="1.3" fill="currentColor" opacity=".55"/>' +
+        '<circle cx="82" cy="72" r="1.3" fill="currentColor" opacity=".55"/>' +
+      '</svg>' +
+      '<span class="bk-brand">TAROT</span>' +
+    '</div>';
+  }
+
+  var HAND_SVG =
+    '<svg class="hand" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="#fdf2d0" stop-opacity=".95"/>' +
+        '<stop offset=".55" stop-color="#e9c878" stop-opacity=".72"/>' +
+        '<stop offset="1" stop-color="#a97b2c" stop-opacity=".4"/>' +
+      '</linearGradient></defs>' +
+      '<path fill="url(#hg)" stroke="rgba(255,238,190,.55)" stroke-width=".35" d="M13 24c-3.26 0-6.19-1.99-7.4-5.02l-3.04-7.59a1.986 1.986 0 0 1 2.79-2.4L9 11.21V4.5a1.5 1.5 0 0 1 3 0v4h1v-6a1.5 1.5 0 0 1 3 0v6h1v-5a1.5 1.5 0 0 1 3 0v5h1v-3.5a1.5 1.5 0 0 1 3 0V16c0 4.42-3.58 8-8 8h-3z"/>' +
+    '</svg>';
+
+  /* ============ 屏幕切换 ============ */
+  function showScreen(name){
+    intro.classList.toggle('active', name === 'intro');
+    table.classList.toggle('active', name === 'table');
+    window.scrollTo(0, 0);
+  }
+
+  /* ============ 主题选择 ============ */
+  $('themes').addEventListener('click', function(e){
+    var b = e.target.closest('.theme');
+    if (!b) return;
+    S.theme = b.getAttribute('data-theme');
+    var all = $('themes').querySelectorAll('.theme');
+    for (var i = 0; i < all.length; i++) {
+      var on = all[i] === b;
+      all[i].classList.toggle('active', on);
+      all[i].setAttribute('aria-checked', String(on));
+    }
+    audioInit();
+    whoosh(.14, .05, 900, 1700);
+  });
+
+  $('startBtn').addEventListener('click', function(){
+    audioInit(); whoosh(.3, .08, 400, 1400);
+    showScreen('table');
+    themeTag.textContent = THEMES[S.theme].label + ' · 三牌';
+    setTimeout(startRound, 80);
+  });
+
+  $('backBtn').addEventListener('click', function(){
+    if (drag) return;
+    showScreen('intro');
+  });
+
+  /* ============ 牌局状态 ============ */
+  function shuffle(arr){
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  function buildDeck(){
+    deck.innerHTML = '';
+    deck.classList.remove('disabled');
+    for (var i = 0; i < 15; i++) {
+      var d = document.createElement('div');
+      d.className = 'deck-layer';
+      d.style.setProperty('--i', i);
+      d.style.zIndex = i;
+      d.innerHTML = backHTML();
+      deck.appendChild(d);
+    }
+    var top = document.createElement('div');
+    top.className = 'deck-layer deck-top';
+    top.style.zIndex = 20;
+    top.innerHTML = backHTML();
+    deck.appendChild(top);
+  }
+
+  function buildSlots(){
+    var html = '';
+    for (var i = 0; i < 3; i++) {
+      html += '<div class="slot" data-slot="' + i + '">' +
+        '<div class="slot-cap"><span class="num">' + NUM[i] + '</span><span>' + POS[i] + '</span></div>' +
+        '<div class="slot-frame"><div class="slot-empty">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">' +
+            '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>' +
+            '<circle cx="12" cy="12" r="9.2" opacity=".35"/>' +
+          '</svg>' +
+        '</div></div>' +
+        '<div class="slot-name"></div>' +
+      '</div>';
+    }
+    slotsEl.innerHTML = html;
+  }
+
+  function setTip(text, gold){
+    tipEl.textContent = text;
+    tipEl.classList.toggle('gold', !!gold);
+  }
+  function setHint(text, lit){
+    deckHint.textContent = text;
+    deckHint.classList.toggle('lit', !!lit);
+  }
+
+  function startRound(){
+    S.deck = shuffle(META.slice());
+    S.slots = [null, null, null];
+    S.busy = true;
+    S.shuffled = false;
+    finaleOpen = false;
+    closeOracle(true);
+    readingsEl.innerHTML = '';
+    finaleEl.innerHTML = '';
+    finaleEl.classList.remove('show');
+    buildSlots();
+    buildDeck();
+    deck.classList.remove('disabled');
+    deck.classList.add('shuffling');
+    setTip('洗牌中，请心中默念你的问题…', false);
+    setHint('洗牌中…', false);
+    sfxShuffle();
+    setTimeout(function(){
+      deck.classList.remove('shuffling');
+      S.busy = false;
+      S.shuffled = true;
+      setTip('轻点牌堆，抽出第一张牌', true);
+      setHint('轻触 · 抽一张牌', true);
+    }, 1500);
+  }
+
+  /* ============ 抽牌拖拽 ============ */
+  var drag = null;
+
+  function nextIndex(){
+    for (var i = 0; i < 3; i++) if (!S.slots[i]) return i;
+    return -1;
+  }
+  function activeSlot(){
+    return slotsEl.querySelectorAll('.slot')[nextIndex()] || null;
+  }
+  function clearHot(){
+    var all = slotsEl.querySelectorAll('.slot');
+    for (var i = 0; i < all.length; i++) all[i].classList.remove('hot');
+  }
+
+  function onDeckDown(e){
+    if (S.busy || nextIndex() < 0) return;
+    if (e.button != null && e.button !== 0) return;
+    audioInit();
+    var r = deck.getBoundingClientRect();
+    var ghost = document.createElement('div');
+    ghost.className = 'drag-card';
+    ghost.style.width = r.width + 'px';
+    ghost.style.height = r.height + 'px';
+    ghost.style.left = r.left + 'px';
+    ghost.style.top = r.top + 'px';
+    ghost.innerHTML = backHTML();
+    fx.appendChild(ghost);
+
+    drag = { id: e.pointerId, ghost: ghost, x0: e.clientX, y0: e.clientY, moved: false, t0: performance.now(), lock: r };
+    try { deck.setPointerCapture(e.pointerId); } catch(err) {}
+    deck.classList.add('drawing');
+    e.preventDefault();
+  }
+
+  function onDeckMove(e){
+    if (!drag || e.pointerId !== drag.id) return;
+    var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (!drag.moved && dist > 7) {
+      drag.moved = true;
+      whoosh(.3, .07, 420, 1500);
+      var s = activeSlot();
+      if (s) s.classList.add('hot');
+      setTip('把牌放上去，或松手让它自己落下', true);
+    }
+    var rot = Math.max(-9, Math.min(9, dx * .05));
+    var lift = drag.moved ? 1 : 0;
+    drag.ghost.style.transform = 'translate3d(' + dx + 'px,' + (dy - lift * 10) + 'px,0) rotate(' + rot + 'deg) scale(' + (1 + lift * .035) + ')';
+    e.preventDefault();
+  }
+
+  function onDeckUp(e){
+    if (!drag || e.pointerId !== drag.id) return;
+    var ghost = drag.ghost, moved = drag.moved;
+    drag = null;
+    deck.classList.remove('drawing');
+    try { deck.releasePointerCapture(e.pointerId); } catch(err) {}
+    clearHot();
+    if (!moved) whoosh(.18, .05, 600, 1400);
+    flyToSlot(ghost);
+    e.preventDefault();
+  }
+
+  function flyToSlot(ghost){
+    var idx = nextIndex();
+    var slot = slotsEl.querySelectorAll('.slot')[idx];
+    if (!slot) { ghost.remove(); return; }
+    var frame = slot.querySelector('.slot-frame');
+    var r = frame.getBoundingClientRect();
+    var baseL = parseFloat(ghost.style.left), baseT = parseFloat(ghost.style.top);
+    var tx = r.left + (r.width - ghost.offsetWidth) / 2 - baseL;
+    var ty = r.top + (r.height - ghost.offsetHeight) / 2 - baseT;
+    ghost.style.transition = 'transform .62s cubic-bezier(.2,.86,.22,1), width .3s, height .3s';
+    ghost.style.width = r.width + 'px';
+    ghost.style.height = r.height + 'px';
+    ghost.style.transform = 'translate3d(' + tx + 'px,' + ty + 'px,0) rotate(-1.4deg) scale(1.01)';
+
+    S.busy = true;
+    setTip('牌已落位 · 按住牌面向上推，慢慢翻开它', true);
+    setHint('按住上推 · 翻开牌面', false);
+
+    setTimeout(function(){
+      ghost.remove();
+      landCard(idx, frame);
+    }, 640);
+  }
+
+  /* ============ 落牌与翻牌 ============ */
+  function landCard(idx, frame){
+    var card = S.deck.pop();
+    var reversed = Math.random() < .32;
+    var item = { card: card, reversed: reversed, revealed: false, p: 0 };
+    S.slots[idx] = item;
+    frame.classList.add('has-card');
+
+    var el = document.createElement('div');
+    el.className = 'card3d pending landed';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', '按住向上推，慢慢翻开这张牌');
+    el.innerHTML =
+      '<div class="halo"></div>' +
+      '<div class="seam"></div>' +
+      '<div class="inner">' +
+        '<div class="face face-back">' + backHTML() + '</div>' +
+        '<div class="face face-front' + (reversed ? ' rev' : '') + '"><img src="' + card.img + '" alt="' + card.name + '" draggable="false"></div>' +
+      '</div>' +
+      HAND_SVG +
+      '<div class="open-hint">按住上推 · 慢慢翻开</div>';
+    frame.appendChild(el);
+
+    var img = el.querySelector('.face-front img');
+    if (img && img.decode) img.decode().catch(function(){});
+
+    // 预取下一张，翻开后即刻可抽
+    var next = S.deck[S.deck.length - 1];
+    if (next) { var pre = new Image(); pre.src = next.img; }
+
+    bindOpen(el, idx, item);
+    setTimeout(function(){ el.classList.remove('landed'); }, 520);
+  }
+
+  function bindOpen(el, idx, item){
+    var start = null;
+
+    function down(e){
+      if (item.revealed || el.classList.contains('settling')) return;
+      if (e.button != null && e.button !== 0) return;
+      audioInit();
+      try { el.setPointerCapture(e.pointerId); } catch(err) {}
+      el.classList.add('opening');
+      start = {
+        id: e.pointerId, y: e.clientY, x: e.clientX,
+        h: Math.max(90, el.getBoundingClientRect().height * .8),
+        p0: item.p, lastP: item.p, t: performance.now()
+      };
+      el.classList.add('dragging');
+      setHand(el, item.p);
+      e.preventDefault();
+    }
+
+    function move(e){
+      if (!start || e.pointerId !== start.id) return;
+      var p = start.p0 + (start.y - e.clientY) / start.h;
+      p = Math.max(0, Math.min(1, p));
+      item.p = p;
+      applyP(el, p);
+      if (Math.abs(p - start.lastP) > .012) {
+        rub(Math.abs(p - start.lastP) * 8);
+        start.lastP = p;
+      }
+      e.preventDefault();
+    }
+
+    function up(e){
+      if (!start || e.pointerId !== start.id) return;
+      var quick = performance.now() - start.t < 280;
+      var movedDist = Math.abs(e.clientY - start.y) + Math.abs(e.clientX - start.x);
+      var p = item.p;
+      el.classList.remove('dragging');
+      try { el.releasePointerCapture(e.pointerId); } catch(err) {}
+      start = null;
+
+      if ((p < .02 && movedDist < 10) || (quick && p < .12)) {
+        autoOpen(el, item, idx);
+        return;
+      }
+      if (p >= .52) {
+        finishOpen(el, item, idx);
+      } else {
+        cancelOpen(el, item);
+      }
+      e.preventDefault();
+    }
+
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!item.revealed && !el.classList.contains('settling')) autoOpen(el, item, idx);
+      }
+    });
+  }
+
+  function applyP(el, p){
+    el.style.setProperty('--p', p);
+    el.style.setProperty('--ry', (p * 180) + 'deg');
+    el.style.setProperty('--ty', (-p * 6) + 'px');
+    var seam = el.querySelector('.seam');
+    if (seam) seam.style.opacity = String(Math.min(p, 1 - p) * 1.9);
+    setHand(el, p);
+  }
+  function setHand(el, p){
+    var hand = el.querySelector('.hand');
+    if (hand) hand.style.transform = 'translate(-50%,' + (74 - p * 118) + 'px) rotate(' + (-16 + p * 9) + 'deg)';
+  }
+
+  function autoOpen(el, item, idx){
+    if (item.revealed || el.classList.contains('settling')) return;
+    el.classList.remove('dragging');
+    el.classList.add('opening');
+    item.p = 1;
+    applyP(el, 1);
+    el.classList.add('settling');
+    rub(.4);
+    setTimeout(function(){
+      el.classList.remove('settling');
+      reveal(el, item, idx);
+    }, 1150);
+  }
+
+  function finishOpen(el, item, idx){
+    el.classList.add('settling');
+    item.p = 1;
+    applyP(el, 1);
+    setTimeout(function(){
+      el.classList.remove('settling');
+      reveal(el, item, idx);
+    }, 1050);
+  }
+
+  function cancelOpen(el, item){
+    item.p = 0;
+    el.classList.add('settling');
+    applyP(el, 0);
+    setTimeout(function(){
+      el.classList.remove('settling');
+      if (item.p < .02) el.classList.remove('opening');
+    }, 700);
+  }
+
+  function reveal(el, item, idx){
+    if (item.revealed) return;
+    item.revealed = true;
+    item.p = 1;
+    el.classList.remove('opening', 'pending', 'dragging');
+    el.classList.add('revealed');
+    el.removeAttribute('tabindex');
+    el.setAttribute('aria-label', item.card.name + (item.reversed ? ' 逆位' : ' 正位'));
+    applyP(el, 1);
+    var hand = el.querySelector('.hand');
+    if (hand) hand.style.opacity = 0;
+
+    bell();
+    burst(el);
+
+    var slot = slotsEl.querySelectorAll('.slot')[idx];
+    var nameEl = slot.querySelector('.slot-name');
+    nameEl.innerHTML = '<b>' + item.card.name + '</b><em class="' + (item.reversed ? 'r' : 'u') + '">' + (item.reversed ? '逆位' : '正位') + '</em>';
+    nameEl.classList.add('show');
+
+    addReading(item, idx);
+
+    S.busy = false;
+    var left = 3 - S.slots.filter(Boolean).length;
+    if (left > 0) {
+      setTip('继续轻点牌堆，抽出' + (idx === 0 ? '第二张牌' : '最后一张牌'), true);
+      setHint('轻触 · 抽一张牌', true);
+    } else {
+      setTip('三张牌已翻开 · 命运正在回应你', true);
+      setHint('占卜完成', false);
+      deck.classList.add('disabled');
+    }
+    setTimeout(function(){ openOracle(item, idx); }, 650);
+  }
+
+  function burst(el){
+    for (var i = 0; i < 14; i++) {
+      var s = document.createElement('i');
+      s.className = 'spark';
+      var ang = Math.random() * Math.PI * 2;
+      var rad = 24 + Math.random() * 62;
+      s.style.setProperty('--tx', (Math.cos(ang) * rad).toFixed(1) + 'px');
+      s.style.setProperty('--ty', (Math.sin(ang) * rad - 18).toFixed(1) + 'px');
+      s.style.animationDelay = (Math.random() * .16).toFixed(2) + 's';
+      s.style.background = i % 3 === 0 ? '#fff6d6' : (i % 3 === 1 ? '#ffd98c' : '#e2a0b7');
+      el.appendChild(s);
+      (function(node){ setTimeout(function(){ node.remove(); }, 1500); })(s);
+    }
+  }
+
+  /* ============ 解读 ============ */
+  function addReading(item, idx){
+    var c = item.card;
+    var rev = item.reversed;
+    var art = document.createElement('article');
+    art.className = 'reading';
+    art.innerHTML =
+      '<div class="r-thumb' + (rev ? ' rev' : '') + '"><img src="' + c.img + '" alt="' + c.name + '" loading="lazy"></div>' +
+      '<div class="r-main">' +
+        '<div class="r-top"><span class="r-pos">' + POS[idx] + '</span>' +
+          '<span class="r-ori' + (rev ? ' r' : '') + '">' + (rev ? '逆位' : '正位') + '</span></div>' +
+        '<h3>' + c.name + '</h3>' +
+        '<div class="r-kw">' + (rev ? c.r : c.u) + '</div>' +
+        '<p>' + (rev ? c.tr : c.tu) + '</p>' +
+      '</div>';
+    readingsEl.appendChild(art);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ art.classList.add('in'); }); });
+  }
+
+  function openOracle(item, idx){
+    var c = item.card, rev = item.reversed;
+    oracleArt.classList.toggle('rev', rev);
+    oracleImg.src = c.img;
+    oracleImg.alt = c.name;
+    oracleKicker.textContent = POS[idx] + '的牌语 · ' + THEMES[S.theme].label;
+    oracleName.textContent = c.name;
+    oracleOri.textContent = rev ? '逆位' : '正位';
+    oracleOri.className = rev ? 'r' : 'u';
+    oracleKw.textContent = rev ? c.r : c.u;
+    oracleText.textContent = rev ? c.tr : c.tu;
+    var all = S.slots.every(function(x){ return x && x.revealed; });
+    oracleBtn.textContent = all ? '查看命运谶语' : '收下这张牌';
+    var box = oracle.querySelector('.oracle-box');
+    if (box) box.scrollTop = 0;
+    oracle.classList.add('show');
+    oracle.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('locked');
+  }
+
+  function closeOracle(silent){
+    if (!oracle.classList.contains('show')) {
+      if (silent) document.body.classList.remove('locked');
+      return;
+    }
+    oracle.classList.remove('show');
+    oracle.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('locked');
+    if (silent) return;
+    var all = S.slots.every(function(x){ return x && x.revealed; });
+    if (all && !finaleOpen) {
+      finaleOpen = true;
+      setTimeout(showFinale, 380);
+    }
+  }
+
+  oracleBtn.addEventListener('click', function(){ closeOracle(false); });
+  $('oracleClose').addEventListener('click', function(){ closeOracle(false); });
+  oracle.addEventListener('click', function(e){ if (e.target === oracle) closeOracle(false); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeOracle(false); });
+
+  function showFinale(){
+    var upright = 0, list = [];
+    for (var i = 0; i < 3; i++) {
+      var it = S.slots[i];
+      if (!it) continue;
+      if (!it.reversed) upright++;
+      list.push('<span class="cl"><b>' + POS[i] + ' · ' + it.card.name + (it.reversed ? '（逆位）' : '（正位）') + '</b></span>');
+    }
+    var summary;
+    if (upright === 3) summary = '三牌皆正，星辰与你同向。此刻的答案清晰而坚定，<span class="em">顺势而为</span>，便是最好的选择。';
+    else if (upright === 2) summary = '两正一逆，大势正在向前，唯有一处仍需你耐心修补。<span class="em">别急着推翻全部</span>，先照顾那个卡住的角落。';
+    else if (upright === 1) summary = '一正两逆，前路起了薄雾。慢下来，<span class="em">先处理心里的阻力</span>，再谈前进的方向。';
+    else summary = '三牌皆逆，宇宙在提醒你暂停。这不是惩罚，而是一次<span class="em">重新校准</span>的机会。';
+
+    var theme = THEMES[S.theme];
+    finaleEl.innerHTML =
+      '<div class="finale-card">' +
+        '<div class="seal">命运谶语</div>' +
+        '<h2>你的三牌启示</h2>' +
+        '<div class="cards-line">' + list.join(' &nbsp;·&nbsp; ') + '</div>' +
+        '<p class="finale-text">' + summary + '<br>' + theme.tail + '</p>' +
+        '<div class="finale-actions">' +
+          '<button class="btn-gold" data-act="again">再占一次</button>' +
+          '<button class="btn-ghost" data-act="theme">换个问题</button>' +
+        '</div>' +
+      '</div>';
+    finaleEl.classList.add('show');
+    setTimeout(function(){
+      try { finaleEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) { finaleEl.scrollIntoView(); }
+    }, 260);
+  }
+
+  finaleEl.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-act]');
+    if (!b) return;
+    if (b.getAttribute('data-act') === 'again') {
+      audioInit(); whoosh(.3, .08, 400, 1500);
+      startRound();
+      try { table.scrollTo({ top: 0, behavior: 'smooth' }); } catch(err) {}
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      showScreen('intro');
+    }
+  });
+
+  /* ============ 牌堆交互 ============ */
+  deck.addEventListener('pointerdown', onDeckDown);
+  deck.addEventListener('pointermove', onDeckMove);
+  deck.addEventListener('pointerup', onDeckUp);
+  deck.addEventListener('pointercancel', function(e){
+    if (!drag || e.pointerId !== drag.id) return;
+    var ghost = drag.ghost;
+    drag = null;
+    deck.classList.remove('drawing');
+    clearHot();
+    ghost.style.transition = 'transform .4s ease, opacity .4s';
+    ghost.style.opacity = '0';
+    setTimeout(function(){ ghost.remove(); }, 420);
+    setTip('轻点牌堆，抽一张牌', true);
+  });
+  deck.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    if (S.busy || nextIndex() < 0) return;
+    audioInit();
+    var r = deck.getBoundingClientRect();
+    var ghost = document.createElement('div');
+    ghost.className = 'drag-card';
+    ghost.style.width = r.width + 'px';
+    ghost.style.height = r.height + 'px';
+    ghost.style.left = r.left + 'px';
+    ghost.style.top = r.top + 'px';
+    ghost.innerHTML = backHTML();
+    fx.appendChild(ghost);
+    whoosh(.18, .05, 600, 1400);
+    flyToSlot(ghost);
+  });
+
+  if (!META.length) {
+    var warn = document.createElement('div');
+    warn.style.cssText = 'position:fixed;inset:auto 16px 16px;z-index:99;padding:12px;border-radius:12px;background:#3a1420;color:#ffd7dd;font-size:13px;text-align:center';
+    warn.textContent = '牌面数据 tarot_data.js 未加载，请确认文件与 tarot_img 文件夹在同目录。';
+    document.body.appendChild(warn);
+  }
+})();
+</script>
+</body>
+</html>
