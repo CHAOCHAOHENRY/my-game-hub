@@ -3640,7 +3640,7 @@ function renderPrizePool() {
     var html = '';
     
     var titles = {
-        1: '🔮 星语塔罗占卜',
+        1: '🔮 烛影塔罗 · 三牌启示',
         2: '🌙 中国农历运程',
         3: '🌌 48星区性格测试',
         4: '🎁 神秘小程序 4',
@@ -3691,7 +3691,7 @@ function renderPrizePool() {
 
 function openPrize(index) {
     if (index === 1) {
-        window.open('/prizes/tarot.html', '_blank');
+        window.open(API_BASE + '/prizes/tarot_mystic.html', '_blank');
     } else if (index === 2) {
         window.open('/prizes/fortune.html', '_blank');
     } else if (index === 3) {
