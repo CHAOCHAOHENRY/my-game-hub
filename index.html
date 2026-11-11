@@ -3611,19 +3611,17 @@ function backToMenu() {
 // 🔥 大厅返回主菜单（附带退座与停止心跳）
 document.getElementById('btn-lobby-back').onclick = function() {
     playSound('click');
-    if (confirm('确定要退出联机大厅返回主菜单吗？')) {
-        if (syncTimer) clearInterval(syncTimer);
-        var u = document.getElementById('lobby-user-name').textContent;
-        if (u && u !== '未登录') {
-            // 退出时顺手把座位退了，免得占着座位
-            fetch(API_BASE + '/api/leave_game', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: u, session_id: mySessionId })
-            }).catch(() => {});
-        }
-        document.getElementById('screen-lobby').style.display = 'none';
-        document.getElementById('screen-menu').style.display = 'flex';
+    if (syncTimer) clearInterval(syncTimer);
+    var u = document.getElementById('lobby-user-name').textContent;
+    if (u && u !== '未登录') {
+        // 退出时顺手把座位退了，免得占着座位
+        fetch(API_BASE + '/api/leave_game', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, session_id: mySessionId })
+        }).catch(() => {});
     }
+    document.getElementById('screen-lobby').style.display = 'none';
+    document.getElementById('screen-menu').style.display = 'flex';
 };
 
 
