@@ -2072,10 +2072,10 @@ function scoreCandidate(g, name, cards, base, isLead) {
     score += cards.length * ((p.type === 'bomb' || p.type === 'sf') ? 5 : AI_LEN_BONUS);
 
     // ② 大牌保留：手里还有小牌时，别先把 A/2/3 的单张 / 对子 / 三条甩掉。
-    // 对手只剩 1 张时例外——先出他压不住的牌卡死，比留大牌更重要。
+    // 对手只剩 ≤4 张时例外——先出他压不住的牌卡死，比留大牌更重要。
     var isBigCard = keyRank >= RANK_VAL['A'];
     var earlyGame = remain.length > 5 && oppMin > 4;
-    if (isLead && isBigCard && oppMin > 1 &&
+    if (isLead && isBigCard && oppMin > 4 &&
         (p.type === 'single' || p.type === 'pair' || p.type === 'triple')) {
         score -= earlyGame ? 5000 : 2600;
     }
@@ -2179,6 +2179,20 @@ function scoreCandidate(g, name, cards, base, isLead) {
     // ⑩ 旧版这里对“出的牌已是场上最大”加 400 分，结果电脑会拿 3/2/A 去
     // 顶掉一张小牌，把最大的牌提前花光。跟牌的最小可压偏好（③）已经够用，
     // 所以这条奖励取消。
+
+    // ⑪ 拦地主：对手快跑完时，抢牌权比省牌、保大牌更重要。
+    // 旧版只按手数算，农民会宁可过牌保住牌型，也不肯用 2/3 去压地主的单张，
+    // 地主剩两三张时农民一路放行。这里按对手剩余张数给足拦牌权重。
+    if (!isLead && base && g.currentPlay && oppMin <= 6) {
+        var baseTeamNow = get_team_solo(g, g.players[g.currentPlay.seat], name);
+        if (baseTeamNow !== myTeam && baseTeamNow !== 'U') {
+            score += oppMin <= 1 ? 9000 :
+                     (oppMin === 2 ? 7000 :
+                     (oppMin === 3 ? 4500 :
+                     (oppMin === 4 ? 2500 :
+                     (oppMin === 5 ? 1200 : 600))));
+        }
+    }
 
     return score;
 }
