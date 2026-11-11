@@ -593,10 +593,34 @@ input, button { outline:none; }
 
 #landlord-badge { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(3); font-size: 120px; font-weight: 900; color: #ffe98a; text-shadow: 0 0 30px #ff0000, 4px 4px 0 #b80018; opacity: 0; transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000; pointer-events: none; letter-spacing: 10px;}
 #landlord-badge.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#landlord-badge.show.flying {
+    transform: translate(calc(-50% + var(--fly-x, 0px)), calc(-50% + var(--fly-y, 0px))) scale(.22);
+    opacity: 0;
+    transition: transform .9s cubic-bezier(.45, 0, .25, 1), opacity .7s ease .12s;
+}
+.seat .nameplate .landlord-tag { transition: opacity .4s ease; }
+body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
 
-#loading-screen { position:fixed; inset:0; background:#1a4a33; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; }
-.loader { border: 5px solid #f3f3f3; border-top: 5px solid #ffd700; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+#loading-screen { position:fixed; inset:0; background:#0a0506; z-index:9999; overflow:hidden;
+    opacity:1; transition:opacity .55s ease; }
+#loading-screen.done { opacity:0; pointer-events:none; }
+.loading-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 46%;
+    transform:scale(1.05); filter:brightness(.9) saturate(.97); }
+.loading-bg:not([src]) { visibility:hidden; }
+.loading-shade { position:absolute; inset:0; pointer-events:none; background:
+    linear-gradient(180deg, rgba(6,3,2,.34) 0%, rgba(6,3,2,.04) 30%, rgba(6,3,2,.10) 52%, rgba(5,2,1,.74) 82%, rgba(4,2,1,.92) 100%),
+    radial-gradient(ellipse 70% 60% at 50% 42%, transparent 46%, rgba(5,2,1,.30) 100%); }
+.loading-ui { position:absolute; left:50%; bottom:calc(clamp(38px,11vh,110px) + env(safe-area-inset-bottom));
+    transform:translateX(-50%); width:min(440px,76vw); text-align:center; z-index:2; }
+.loading-bar { position:relative; height:9px; border-radius:999px; overflow:hidden;
+    background:rgba(255,235,190,.16); border:1px solid rgba(255,220,150,.42);
+    box-shadow:0 4px 16px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.14); }
+.loading-fill { height:100%; width:0%; border-radius:999px;
+    background:linear-gradient(90deg,#f7dc94,#ffc247 55%,#ffe9b0);
+    box-shadow:0 0 14px rgba(255,200,90,.7); transition:width .18s linear; }
+#loading-text { margin-top:12px; color:#ffe6ab; font-size:13px; font-weight:700; letter-spacing:.2em;
+    text-shadow:0 1px 3px rgba(0,0,0,.85); }
+@media (max-width:480px){ #loading-text{font-size:12px; letter-spacing:.14em} .loading-ui{width:80vw} }
 
 /* ================= 🔥 手机端完美适配区 🔥 ================= */
 @media (max-width: 900px) {
@@ -720,8 +744,14 @@ body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
 <body>
 
 <div id="loading-screen">
-    <div class="loader"></div>
-    <div style="color:#ffe98a; font-weight:bold; font-size:18px;" id="loading-text">正在加载游戏资源 0%...</div>
+    <img id="loading-bg" class="loading-bg" alt="" aria-hidden="true">
+    <div class="loading-shade" aria-hidden="true"></div>
+    <div class="loading-ui">
+        <div class="loading-bar" id="loading-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="loading-fill" id="loading-fill"></div>
+        </div>
+        <div id="loading-text">正在加载游戏资源 0%</div>
+    </div>
 </div>
 
 <div id="screen-title" aria-label="新会寻鸡笼，制作人潮流之神">
@@ -951,7 +981,6 @@ body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
 <script>
 // ================= 🔥 核心配置区 🔥 =================
 var API_BASE = 'https://game.chaochaoddzhenry2026.dpdns.org'; // 填你刚刚弄好的后端地址
-var ASSET_VERSION = '2026-11-08-1'; // 卡牌/音效有更新时改这个版本号，重进才会重新预加载
 // ===================================================
 
 var audioCache = {};
@@ -1001,6 +1030,7 @@ var titleBgSrc = TITLE_BG_LIST[(Math.random() * TITLE_BG_LIST.length) | 0];
 var preloadCount = 0;
 var totalAssets = 0;
 var loadingFinished = false;
+var LOADING_MIN_MS = 1200; // 进度条至少走这么久，避免一闪而过
 // 预加载后保留 Image 对象：浏览器的解码位图会随对象存活，出牌时可立刻绘制，不会一张张慢慢刷
 var cardImgCache = {};
 
@@ -1010,7 +1040,21 @@ function enterMenuDirect() {
     document.getElementById('screen-menu').style.display = 'flex';
 }
 
-function preloadAssets(showLoadingScreen) {
+// 加载条淡出前，先把同一张底图无过渡地铺到标题页，避免闪黑
+function showTitleBackdrop() {
+    var screen = document.getElementById('screen-title');
+    var bg = document.getElementById('title-bg');
+    if (!screen) return;
+    screen.style.display = 'flex';
+    screen.style.opacity = '1';
+    if (!bg) return;
+    bg.style.transition = 'none';
+    bg.src = titleBgSrc;
+    bg.classList.add('ready');
+}
+
+function preloadAssets() {
+    if (loadingFinished) return;
     var suits = ['c','h','s','d'];
     var ranks = ['4','5','6','7','8','9','10','J','Q','K','A','2','3'];
     
@@ -1026,28 +1070,50 @@ function preloadAssets(showLoadingScreen) {
     // 加载页只等卡牌图片；短音效后台加载，BGM 首次点击时按需创建
     var audioList = ['click','play','play2','play3','play4','pass','pass2','win','lose'];
     totalAssets = imgList.length;
+    preloadCount = 0;
+
+    var fillEl = document.getElementById('loading-fill');
+    var textEl = document.getElementById('loading-text');
+    var barEl = document.getElementById('loading-bar');
+    var bgEl = document.getElementById('loading-bg');
+    if (bgEl) bgEl.src = titleBgSrc;
+
+    var loadStart = performance.now();
+    var realPct = 0;
     var assetsReady = false;
+    var tickTimer = 0;
+
+    function paintProgress() {
+        if (loadingFinished) return;
+        var timePct = ((performance.now() - loadStart) / LOADING_MIN_MS) * 100;
+        var done = assetsReady && timePct >= 100;
+        var pct = done ? 100 : Math.max(0, Math.min(96, Math.floor(Math.min(realPct, timePct))));
+        if (fillEl) fillEl.style.width = pct + '%';
+        if (barEl) barEl.setAttribute('aria-valuenow', String(pct));
+        if (textEl) textEl.textContent = done ? '即将进入新会…' : '正在加载游戏资源 ' + pct + '%';
+        if (done) finishLoading();
+    }
+
+    function updateProgress() {
+        preloadCount++;
+        realPct = Math.floor((preloadCount / totalAssets) * 100);
+        if (preloadCount >= totalAssets) assetsReady = true;
+        paintProgress();
+    }
     
     function finishLoading() {
         if (loadingFinished) return;
         loadingFinished = true;
-        if (assetsReady) {
-            try { localStorage.setItem('ddzAssetVersion', ASSET_VERSION); } catch(e) {}
-        }
-        // 资源已缓存过时不显示加载页，后台静默预热即可，开场动画照常播放
-        if (showLoadingScreen === false) return;
-        document.getElementById('loading-screen').classList.add('hidden');
-        startTitleAnimation();
-    }
-    
-    function updateProgress() {
-        preloadCount++;
-        var pct = Math.floor((preloadCount / totalAssets) * 100);
-        document.getElementById('loading-text').textContent = '正在加载游戏资源 ' + pct + '%...';
-        if (preloadCount >= totalAssets) {
-            assetsReady = true;
-            setTimeout(finishLoading, 300);
-        }
+        clearInterval(tickTimer);
+        var screenEl = document.getElementById('loading-screen');
+        showTitleBackdrop();
+        setTimeout(function(){
+            if (screenEl) screenEl.classList.add('done');
+            setTimeout(function(){
+                if (screenEl) screenEl.classList.add('hidden');
+                startTitleAnimation();
+            }, 600);
+        }, 280);
     }
     
     imgList.forEach(src => {
@@ -1076,8 +1142,10 @@ function preloadAssets(showLoadingScreen) {
         audioCache[name] = a;
     });
     
+    tickTimer = setInterval(paintProgress, 50);
+    paintProgress();
     // 极慢网络/个别图片异常时也不把用户卡在加载页
-    setTimeout(finishLoading, 8000);
+    setTimeout(function () { assetsReady = true; paintProgress(); }, 8000);
 }
 
 var titleAnim = { started: false, finished: false, raf: 0, timers: [] };
@@ -2466,10 +2534,8 @@ function start_new_game_solo() {
                 G.choice = 'call';
                 G.landlord_public = true;
                 G.phase = "play";
-                // 🔥 新增：电脑叫地主也显示"地主"大字特效
-                var badge = $('landlord-badge');
-                badge.classList.add('show');
-                setTimeout(function(){ badge.classList.remove('show'); }, 3000);
+                // 🔥 电脑叫地主：中间弹出“地主”，停留两秒后飞向地主座位
+                showLandlordBadge(G.landlord);
             } else if (power <= 5) {
                 // 手牌烂 → 弃牌小输
                 G.choice = 'fold';
@@ -2581,6 +2647,7 @@ function checkSoloAITurn() {
     
     setTimeout(function() {
         if (G.phase !== 'play' || G.turn !== currSeat) return;
+        if (llBadgeActive) return; // 等“地主”大字飞完再出牌
         
         var name = G.players[currSeat];
         var hand = G.hands[currSeat];
@@ -2747,14 +2814,54 @@ function showSoloGameover() {
     else playSound('lose');
 }
 
+var llBadgeTimer = null;
+var llBadgeActive = false;
+function showLandlordBadge(seatIdx) {
+    var badge = $('landlord-badge');
+    if (!badge) return;
+    if (llBadgeTimer) { clearTimeout(llBadgeTimer); llBadgeTimer = null; }
+    badge.classList.remove('show', 'flying');
+    badge.style.removeProperty('--fly-x');
+    badge.style.removeProperty('--fly-y');
+    llBadgeActive = true;
+    document.body.classList.add('ll-badge');
+    void badge.offsetWidth; // 连续触发时也能重新弹出
+    badge.classList.add('show');
+    llBadgeTimer = setTimeout(function(){
+        var seat = (seatIdx == null || seatIdx < 0) ? null : $('seat-' + seatIdx);
+        var target = seat ? (seat.querySelector('.nameplate') || seat) : null;
+        if (!target) {
+            badge.classList.remove('show');
+            document.body.classList.remove('ll-badge');
+            llBadgeActive = false;
+            llBadgeTimer = null;
+            if (typeof isSoloMode !== 'undefined' && isSoloMode) checkSoloAITurn();
+            return;
+        }
+        var b = badge.getBoundingClientRect();
+        var r = target.getBoundingClientRect();
+        badge.style.setProperty('--fly-x', ((r.left + r.width / 2) - (b.left + b.width / 2)).toFixed(1) + 'px');
+        badge.style.setProperty('--fly-y', ((r.top + r.height / 2) - (b.top + b.height / 2)).toFixed(1) + 'px');
+        badge.classList.add('flying');
+        llBadgeTimer = setTimeout(function(){
+            badge.classList.remove('show', 'flying');
+            badge.style.removeProperty('--fly-x');
+            badge.style.removeProperty('--fly-y');
+            document.body.classList.remove('ll-badge');
+            llBadgeActive = false;
+            llBadgeTimer = null;
+            // 大字落位后再让电脑行动，避免出牌被遮住
+            if (typeof isSoloMode !== 'undefined' && isSoloMode) checkSoloAITurn();
+        }, 960);
+    }, 2000);
+}
+
 function choiceLandlordSolo(c) {
     playSound('click');
     G.choice = c;
     if (c === 'call') {
         G.landlord_public = true;
-        var badge = $('landlord-badge');
-        badge.classList.add('show');
-        setTimeout(() => { badge.classList.remove('show'); }, 3000);
+        showLandlordBadge(0);
     }
     $('landlord-dialog').classList.add('hidden');
     
@@ -2971,11 +3078,9 @@ function doSync() {
                 if (data.game.landlord_reveal_time &&
                     data.game.landlord_reveal_time !== window._lastLandlordRevealTime) {
                     window._lastLandlordRevealTime = data.game.landlord_reveal_time;
-                    var badge = document.getElementById('landlord-badge');
-                    if (badge) {
-                        badge.classList.add('show');
-                        setTimeout(function(){ badge.classList.remove('show'); }, 3000);
-                    }
+                    var llIdx = data.game.players ? data.game.players.indexOf(data.game.landlord) : -1;
+                    var llSeat = llIdx >= 0 ? (llIdx - data.game.my_seat + 4) % 4 : 0;
+                    showLandlordBadge(llSeat);
                 }
                 updateGameState(data.game, myName);
             }
@@ -3048,9 +3153,7 @@ function choiceLandlord(c) {
     if (isSoloMode) return choiceLandlordSolo(c);
     playSound('click');
     if (c === 'call') {
-        var badge = $('landlord-badge');
-        badge.classList.add('show');
-        setTimeout(() => { badge.classList.remove('show'); }, 3000);
+        showLandlordBadge(0);
     }
     
     fetch(API_BASE + '/api/choice', {
@@ -3386,15 +3489,7 @@ function renderAll() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    var cachedAssetVer = null;
-    try { cachedAssetVer = localStorage.getItem('ddzAssetVersion'); } catch(e) {}
-    if (cachedAssetVer === ASSET_VERSION) {
-        startTitleAnimation();
-        // 仍要在开机时把 52 张牌图解码好，否则出牌时又会一张张现读
-        preloadAssets(false);
-    } else {
-        preloadAssets(true);
-    }
+    preloadAssets();
     var lastUser = null;
     try { lastUser = localStorage.getItem('lastUser'); } catch(e) {}
     if (lastUser) {
