@@ -493,6 +493,8 @@ input, button { outline:none; }
 .seat .opp-hand { margin-top:2px; display:flex; justify-content:center; }
 .seat .opp-hand img { width:var(--opp-w, 50px); height:calc(var(--opp-w, 50px) * 1.4); margin-left:calc(var(--opp-w, 50px) * -0.35); border-radius: 4px; box-shadow:0 2px 6px rgba(0,0,0,0.5); }
 .seat .opp-hand img:first-child { margin-left: 0; }
+/* 结算亮牌：原来背着的牌原地翻开，用更小的牌面避免占满牌桌 */
+.seat .opp-hand.open img { width:calc(var(--opp-w, 50px) * 0.58); height:calc(var(--opp-w, 50px) * 0.58 * 1.4); margin-left:calc(var(--opp-w, 50px) * -0.3); border-radius:3px; border:1px solid rgba(0,0,0,0.35); }
 
 #trick-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); min-width:330px; z-index:15; text-align:center; }
 #trick-center::before {
@@ -578,6 +580,13 @@ input, button { outline:none; }
 @keyframes popIn {
     0% { transform: scale(0.8); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
+}
+
+/* 结算弹窗：手机上贴底，露出上家/两边的亮牌；桌面仍居中 */
+#gameover-dialog { background: rgba(0,0,0,0.45); }
+@media (max-width: 640px) {
+    #gameover-dialog { align-items: flex-end; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+    #gameover-dialog .dialog-box { margin-top: 0; width: 92vw; box-sizing: border-box; }
 }
 
 /* 奖品池专属弹窗样式 */
@@ -2581,8 +2590,10 @@ function updateGameStateSolo() {
     mySeat = 0;
     
     var renderHands = [[],[],[],[]];
+    // 结算时把各人剩下的牌从牌背翻成牌面（地主弃牌认输的局不亮）
+    var revealOpen = (G.phase === 'ended' && !(G.team_mode === "1v3" && G.choice === 'fold'));
     for (var i=0; i<4; i++) {
-        if (i === 0) renderHands[i] = G.hands[i].map(function(id){ return mk(id[0], id.slice(1)); });
+        if (i === 0 || revealOpen) renderHands[i] = G.hands[i].map(function(id){ return mk(id[0], id.slice(1)); });
         else renderHands[i] = new Array(G.hands[i].length);
     }
     
@@ -2904,6 +2915,7 @@ function renderAllSingle(tempG) {
         }
     }
     
+    var revealOpen = (tempG.phase === 'ended' && !(tempG.team_mode === "1v3" && tempG.choice === 'fold'));
     for(var i=0; i<4; i++) {
         var visualPos = (i - 0 + 4) % 4; 
         var box = $('seat-' + visualPos);
@@ -2912,7 +2924,8 @@ function renderAllSingle(tempG) {
         
         var llHtml = isLL ? '<span class="landlord-tag">地主</span>' : '';
         var plateHtml = llHtml + '<span class="p-name">'+dispName(tempG.players[i])+'</span><span class="cnt">'+cnt+'张</span>';
-        setSeatBox(box, plateHtml, i + '|' + tempG.players[i] + '|' + cnt + '|' + isLL, tempG.turn === i, i !== 0 ? cnt : 0);
+        var faceCards = (i !== 0 && revealOpen) ? tempG.hands[i] : null;
+        setSeatBox(box, plateHtml, i + '|' + tempG.players[i] + '|' + cnt + '|' + isLL, tempG.turn === i, i !== 0 ? cnt : 0, faceCards);
     }
     
     var el = $('trick-center'); var stat = $('trick-status');
@@ -3049,6 +3062,7 @@ function doSync() {
                     var scStr = sc > 0 ? '+'+sc : sc;
                     details += '<div>'+(i+1)+'名: '+dispName(p)+' <span style="color:'+(sc>0?'#8ef09a':(sc<0?'#ffb0b0':'#fff'))+'">('+scStr+'分)</span></div>';
                 });
+                // 结算亮牌由座位上的牌背原地翻开完成，这里只显示分数
                 $('gameover-details').innerHTML = details;
             } else {
                 $('gameover-dialog').classList.add('hidden');
@@ -3133,7 +3147,8 @@ function updateGameState(game, myName) {
         if (i === mySeat) {
             if (game.my_hand) G.hands[mySeat] = game.my_hand.map(function(id){ return mk(id[0], id.slice(1)); });
         } else {
-            G.hands[i] = new Array(game.hands_count[i]);
+            var rev = (game.phase === 'ended' && game.revealed_hands) ? game.revealed_hands[game.players[i].name] : null;
+            G.hands[i] = rev ? rev.map(function(id){ return mk(id[0], id.slice(1)); }) : new Array(game.hands_count[i]);
         }
     }
     
@@ -3343,7 +3358,7 @@ function toggleCardSelection(im) {
 }
 
 // 座位内容没变就不动 DOM；牌背只增删数量，避免每次电脑出牌整排牌背重建导致闪屏
-function setSeatBox(box, plateHtml, plateSig, isTurn, backCount) {
+function setSeatBox(box, plateHtml, plateSig, isTurn, backCount, faceCards) {
     if (!box) return;
     var plate = box.firstElementChild;
     if (!plate || !plate.classList.contains('nameplate')) plate = null;
@@ -3357,20 +3372,39 @@ function setSeatBox(box, plateHtml, plateSig, isTurn, backCount) {
     }
 
     var hand = box.querySelector('.opp-hand');
-    var want = Math.min(backCount || 0, 9);
-    if (want > 0) {
-        if (!hand) {
-            box.insertAdjacentHTML('beforeend', '<div class="opp-hand"></div>');
-            hand = box.querySelector('.opp-hand');
+    // 结算亮牌：有真实牌面就直接铺开，否则按剩余张数显示牌背
+    var face = (faceCards && faceCards.length && faceCards[0] && faceCards[0].id) ? faceCards : null;
+    var handSig = face
+        ? 'f:' + face.map(function(c){ return c.id; }).join(',')
+        : 'b:' + Math.min(backCount || 0, 9);
+    if (handSig !== box._handSig) {
+        box._handSig = handSig;
+        if (face || (backCount || 0) > 0) {
+            if (!hand) {
+                box.insertAdjacentHTML('beforeend', '<div class="opp-hand"></div>');
+                hand = box.querySelector('.opp-hand');
+            }
+            hand.className = 'opp-hand' + (face ? ' open' : '');
+            hand.innerHTML = '';
+            if (face) {
+                face.slice().sort(function(a,b){ return strength(b.id) - strength(a.id); }).forEach(function(c){
+                    var im = document.createElement('img');
+                    im.src = img(c.id);
+                    im.alt = cardName(c.id);
+                    im.decoding = 'async';
+                    hand.appendChild(im);
+                });
+            } else {
+                var want = Math.min(backCount, 9);
+                for (var j = 0; j < want; j++) {
+                    var im = document.createElement('img');
+                    im.src = 'cards/back1.png';
+                    hand.appendChild(im);
+                }
+            }
+        } else if (hand) {
+            hand.remove();
         }
-        while (hand.children.length > want) hand.removeChild(hand.lastElementChild);
-        while (hand.children.length < want) {
-            var im = document.createElement('img');
-            im.src = 'cards/back1.png';
-            hand.appendChild(im);
-        }
-    } else if (hand) {
-        hand.remove();
     }
 
     var cls = 'seat' + (isTurn ? ' turn' : '');
@@ -3459,7 +3493,10 @@ function renderAll() {
         var llHtml = isLL ? '<span class="landlord-tag">地主</span>' : '';
         
         var plateHtml = statusHtml+llHtml+'<span class="p-name">'+dispName(G.players[i])+'</span><span class="cnt">'+cnt+'张</span>';
-        setSeatBox(box, plateHtml, mySeat + '|' + i + '|' + G.players[i] + '|' + cnt + '|' + isOnline + '|' + isLL, G.turn === i, i !== mySeat ? cnt : 0);
+        // 结算亮牌后 G.hands[i] 里是真实牌面，直接原地翻开
+        var faceCards = null;
+        if (i !== mySeat && G.hands[i] && G.hands[i][0] && G.hands[i][0].id) faceCards = G.hands[i];
+        setSeatBox(box, plateHtml, mySeat + '|' + i + '|' + G.players[i] + '|' + cnt + '|' + isOnline + '|' + isLL, G.turn === i, i !== mySeat ? cnt : 0, faceCards);
     }
     
     var el = $('trick-center'); var stat = $('trick-status');
