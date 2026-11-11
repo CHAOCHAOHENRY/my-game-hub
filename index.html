@@ -1841,14 +1841,29 @@ function getAllPlaysFull(hand) {
         });
     }
 
-    // 去重 + 过滤非法牌型
+    // 去重 + 过滤非法牌型。
+    // 整手牌没有 5 张同花时，同点数不同花色打出去效果完全一样（只影响花色比大小），
+    // 按“牌型 + 点数组合”收敛成一种，候选数能从几百降到几十，评分不再逐个穷举。
+    var handSuit = {}, handMaxSuit = 0;
+    hand.forEach(function(c){
+        handSuit[c[0]] = (handSuit[c[0]] || 0) + 1;
+        if (handSuit[c[0]] > handMaxSuit) handMaxSuit = handSuit[c[0]];
+    });
+    var noFlush = handMaxSuit < 5;
     var seen = {};
     var result = [];
     P.forEach(function(cards){
-        var k = cards.slice().sort().join(',');
+        var p = analyze(cards);
+        if (!p) return;
+        var k;
+        if (noFlush) {
+            k = p.type + '|' + cards.map(function(c){ return c.slice(1); }).sort().join(',');
+        } else {
+            k = cards.slice().sort().join(',');
+        }
         if (seen[k]) return;
         seen[k] = true;
-        if (analyze(cards)) result.push(cards);
+        result.push(cards);
     });
 
     _allPlaysCache.set(key, result);
@@ -1883,7 +1898,10 @@ function getUnknownCards(g, name) {
 // 记牌器：算出"还没露面"的牌按点数的张数（同一轮内多个候选共用一份）
 var _unkCache = { key: null, byRank: null };
 function unkByRankOf(g, name) {
-    var k = name + '#' + (g.history ? g.history.length : 0);
+    var myIdx0 = g.players.indexOf(name);
+    var myHand0 = g.hands[myIdx0] || [];
+    // 缓存键带上自己的手牌：只靠 history 长度会在新一局长度相同时命中上一局的记牌结果
+    var k = name + '#' + (g.history ? g.history.length : 0) + '#' + myHand0.slice().sort().join(',');
     if (_unkCache.key !== k) {
         _unkCache.key = k;
         _unkCache.byRank = {};
@@ -1893,6 +1911,23 @@ function unkByRankOf(g, name) {
         });
     }
     return _unkCache.byRank;
+}
+
+// 记牌器：某个座位最近一次动作是“不出”时，记录他放弃压的牌型。
+// 连续在同一牌型上过牌，说明他手里大概率没有这类牌。
+function recentlyPassedOn(g, seat, type) {
+    var h = g.history || [];
+    for (var i = h.length - 1; i >= 0; i--) {
+        if (h[i].seat !== seat) continue;
+        if (h[i].type !== 'pass') return false;
+        for (var j = i - 1; j >= 0; j--) {
+            if (h[j].type !== 'play') continue;
+            var p = analyze(h[j].cards);
+            return !!(p && p.type === type);
+        }
+        return false;
+    }
+    return false;
 }
 
 // 手数估算：修正旧版两个不同单张估成 1 手的问题
@@ -1941,15 +1976,7 @@ function estimateHandCount(cards) {
         }
     }
 
-    // 2. 炸弹（4 张同点算 1 手）
-    for (var r in byRank) {
-        while (byRank[r] && byRank[r].length >= 4) {
-            removeCards(byRank[r].slice(0, 4));
-            hands++; rebuild();
-        }
-    }
-
-    // 3. 同花（5 张同花色）
+    // 2. 同花（5 张同花色）
     found = true;
     while (found) {
         found = false;
@@ -1962,7 +1989,7 @@ function estimateHandCount(cards) {
         }
     }
 
-    // 4. 顺子
+    // 3. 顺子
     found = true;
     while (found) {
         found = false;
@@ -1976,27 +2003,61 @@ function estimateHandCount(cards) {
         }
     }
 
-    // 5. 葫芦（三条 + 对子 各一手价，视作 2 手扣减 1 手，跟实际出牌一致）
-    var triples = [], pairs = [];
-    for (var r in byRank) {
-        if (byRank[r].length >= 3) triples.push(r);
-        if (byRank[r].length >= 2) pairs.push(r);
-    }
-    triples.forEach(function(tr){
-        if (byRank[tr] && byRank[tr].length >= 3 && pool.indexOf(byRank[tr][0]) >= 0) {
-            removeCards(byRank[tr].slice(0, 3));
-            hands++;
-        }
-    });
-    rebuild();
-    for (var r in byRank) {
-        while (byRank[r] && byRank[r].length >= 2) {
-            removeCards(byRank[r].slice(0, 2));
+    // 4. 炸弹：本规则是 4 张同点 + 任意 1 张。
+    //    有第 5 张时算 1 手；只剩 4 张同点不能当炸弹，留给后面的三条/对子拆成 2 手。
+    for (var rb in byRank) {
+        while (byRank[rb] && byRank[rb].length >= 4 && pool.length > byRank[rb].length) {
+            var kicker = null, kickCnt = 99, kickStr = 999;
+            for (var pk = 0; pk < pool.length; pk++) {
+                var cand = pool[pk];
+                if (cand.slice(1) === rb) continue;
+                var cCnt = byRank[cand.slice(1)].length;
+                var cStr = strength(cand);
+                if (cCnt < kickCnt || (cCnt === kickCnt && cStr < kickStr)) {
+                    kickCnt = cCnt; kickStr = cStr; kicker = cand;
+                }
+            }
+            if (!kicker) break;
+            removeCards(byRank[rb].slice(0, 4).concat([kicker]));
             hands++; rebuild();
         }
     }
 
-    // 6. 剩余单张
+    // 5. 葫芦：三条 + 对子合成 1 手（AAAKK 不再拆成 2 手）
+    found = true;
+    while (found) {
+        found = false;
+        var triples = [], pairs = [];
+        for (var rt in byRank) {
+            if (byRank[rt].length >= 3) triples.push(rt);
+            if (byRank[rt].length >= 2) pairs.push(rt);
+        }
+        for (var ti = 0; ti < triples.length && !found; ti++) {
+            for (var pi = 0; pi < pairs.length; pi++) {
+                if (pairs[pi] === triples[ti]) continue;
+                removeCards(byRank[triples[ti]].slice(0, 3).concat(byRank[pairs[pi]].slice(0, 2)));
+                hands++; found = true; rebuild(); break;
+            }
+        }
+    }
+
+    // 6. 三条
+    for (var r3 in byRank) {
+        while (byRank[r3] && byRank[r3].length >= 3) {
+            removeCards(byRank[r3].slice(0, 3));
+            hands++; rebuild();
+        }
+    }
+
+    // 7. 对子
+    for (var r4 in byRank) {
+        while (byRank[r4] && byRank[r4].length >= 2) {
+            removeCards(byRank[r4].slice(0, 2));
+            hands++; rebuild();
+        }
+    }
+
+    // 8. 剩余单张
     hands += pool.length;
 
     var v = Math.max(1, hands);
@@ -2011,7 +2072,16 @@ var _exactHandMemo = new Map();
 function handCount(cards) {
     if (!cards || cards.length === 0) return 0;
     if (cards.length > 9) return estimateHandCount(cards);
-    var k = cards.slice().sort().join(',');
+    // 同花/同花顺需要 5 张同花色；没有 5 张同花时手数只取决于点数组合，
+    // 用点数做键让不同花色的同类候选共享缓存，省掉大量重复穷举。
+    var suitCnt = {}, maxSuit = 0;
+    for (var ci = 0; ci < cards.length; ci++) {
+        var sc = cards[ci][0];
+        suitCnt[sc] = (suitCnt[sc] || 0) + 1;
+        if (suitCnt[sc] > maxSuit) maxSuit = suitCnt[sc];
+    }
+    var k = maxSuit >= 5 ? cards.slice().sort().join(',') :
+        'R:' + cards.map(function(c){ return c.slice(1); }).sort().join(',');
     if (_exactHandMemo.has(k)) return _exactHandMemo.get(k);
     var plays = getAllPlaysFull(cards), best = 99;
     for (var i = 0; i < plays.length; i++) {
@@ -2029,13 +2099,20 @@ function handCount(cards) {
     return best;
 }
 
-// 一手多甩一张牌的奖励。手数项是 1000/手，400/张 ≈ 0.4 手：
-// 让电脑优先把顺子/同花/葫芦这类多张牌型早出掉，而不是先甩最大的对子；
+// 一手多甩一张牌的奖励。手数项是 1000/手，300/张 ≈ 0.3 手：
+// 让电脑优先把顺子/同花/葫芦这类多张牌型早出掉，但不要为了多甩牌强行拆对子；
 // 炸弹和同花顺不吃这个奖励，仍按 ⑤ 保留。
-var AI_LEN_BONUS = 400;
+var AI_LEN_BONUS = 300;
 
-// (对手最少张数, 队友最少张数)。已出完牌(0 张)的玩家不计入：
-// 他们不能再跟牌，旧版把他们当成“只剩 1 张的威胁”，会让电脑在残局误判抢牌权。
+// (对手最少张数, 队友最少张数)。已出完牌(0 张)的玩家不计入。
+// 隐藏地主模式下农民看别人都是 'U'（可能是队友也可能是地主）。这里按最坏情况
+// 把 'U' 当成潜在对手：谁快跑完都要防，否则 oppMin 恒为 99，⑥/⑪ 全部失效，
+// AI 不知道有人只剩一两张，该拦也不拦。队友数不推断，⑧ 的喂牌逻辑在隐藏局不启用。
+//
+// 自博弈实测（隐藏局 60~100 局，同一批牌对比）：把 U 当潜在对手地主胜率 17~23%；
+// 完全跳过 U 并少压（跟牌 -3000）地主胜率 96.7%；只跳过 U 正常评分为 35%；
+// 残局才抢（-1500/+3000）也有 60~70%。隐藏局只有地主跑完才结束，农民完全不压
+// 等于放地主跑，所以这里保留 U 作为潜在威胁，不要改回“不压未知身份的人”。
 function sideCountsSolo(g, name, viewer) {
     var v = viewer || name;
     var myIdx = g.players.indexOf(name);
@@ -2045,7 +2122,9 @@ function sideCountsSolo(g, name, viewer) {
         if (i === myIdx) continue;
         var cnt = g.hands[i] ? g.hands[i].length : 0;
         if (cnt === 0) continue;
-        if (get_team_solo(g, g.players[i], v) !== myTeam) opp = Math.min(opp, cnt);
+        var team = get_team_solo(g, g.players[i], v);
+        if (team === 'U') { opp = Math.min(opp, cnt); continue; }
+        if (team !== myTeam) opp = Math.min(opp, cnt);
         else mate = Math.min(mate, cnt);
     }
     return [opp, mate];
@@ -2089,9 +2168,12 @@ function scoreCandidate(g, name, cards, base, isLead) {
         score -= earlyGame ? 5000 : 2600;
     }
 
-    // ③ 跟牌：优先最小可压（点数越小越奖励）
+    // ③ 跟牌：优先最小可压（点数越小越奖励）。
+    // 5 张牌型（顺子/同花/葫芦/炸弹/同花顺）只做轻微代价，避免为了省牌
+    // 宁可过牌也不肯用同花压顺子，白丢牌权。
     if (!isLead && base) {
-        score -= keyRank * 40;
+        if (p.type === 'single' || p.type === 'pair' || p.type === 'triple') score -= keyRank * 40;
+        else score -= keyRank * 8;
     }
 
     // ④ 拆牌代价
@@ -2112,10 +2194,11 @@ function scoreCandidate(g, name, cards, base, isLead) {
         if (cnt3 >= 4) score -= 400;
     }
 
-    // ⑤ 炸弹 / 同花顺保留：中前期严禁使用
+    // ⑤ 炸弹 / 同花顺保留：残局或对手快跑完时主动抢牌权，
+    // 中盘只做轻微保留，只有开局（剩 10 张以上且对手都还远）才重罚。
     if (p.type === 'bomb' || p.type === 'sf') {
-        if (remain.length <= 3 || oppMin <= 2) score += 800;
-        else if (remain.length <= 6) score -= 2000;
+        if (remain.length <= 5 || oppMin <= 4) score += 800;
+        else if (remain.length <= 9 || oppMin <= 6) score -= 800;
         else score -= 6000;
     }
 
@@ -2149,7 +2232,9 @@ function scoreCandidate(g, name, cards, base, isLead) {
     var nextCnt = g.hands[next] ? g.hands[next].length : 0;
     if (nextCnt && nextTeam !== myTeam && nextTeam !== 'U' && isLead &&
         (p.type === 'single' || p.type === 'pair')) {
-        if (nextCnt <= 2 && keyRank < RANK_VAL['A']) score -= 500;
+        if (recentlyPassedOn(g, next, p.type)) {
+            score += 150; // 他刚在这个牌型上过牌，大概率压不动
+        } else if (nextCnt <= 2 && keyRank < RANK_VAL['A']) score -= 500;
         else if (nextCnt >= 4 && keyRank < RANK_VAL['Q']) score -= 400;
     }
 
@@ -2194,12 +2279,14 @@ function scoreCandidate(g, name, cards, base, isLead) {
     // 地主剩两三张时农民一路放行。这里按对手剩余张数给足拦牌权重。
     if (!isLead && base && g.currentPlay && oppMin <= 6) {
         var baseTeamNow = get_team_solo(g, g.players[g.currentPlay.seat], name);
-        if (baseTeamNow !== myTeam && baseTeamNow !== 'U') {
-            score += oppMin <= 1 ? 9000 :
+        if (baseTeamNow !== myTeam) {
+            // 隐藏地主模式认不出阵营：可能是地主，也可能是队友，按半个对手的威慑力给分
+            var blockW = baseTeamNow === 'U' ? 0.5 : 1;
+            score += Math.round(blockW * (oppMin <= 1 ? 9000 :
                      (oppMin === 2 ? 7000 :
                      (oppMin === 3 ? 4500 :
                      (oppMin === 4 ? 2500 :
-                     (oppMin === 5 ? 1200 : 600))));
+                     (oppMin === 5 ? 1200 : 600))))));
         }
     }
 
@@ -2319,12 +2406,11 @@ function ai_follow_solo(g, name, base) {
     var baseHandCnt = g.hands[baseSeat] ? g.hands[baseSeat].length : 0;
     var oppMin = sideCountsSolo(g, name, name)[0];
 
-    // 🔥 队友出牌：确认是队友才默认不压。两种情况例外：
-    // 1. 队友剩牌多（>=3），敌家已剩 1 张即将跑完 → 我抢过来拖时间
-    //    且抢过来必须"一手出完"（否则抢了也白抢）
-    // 2. 队友剩 1-2 张 → 绝不抢（让他自己跑）
+    // 🔥 队友出牌：确认是队友才默认不压。说明：能一手出完的牌在函数开头
+    // 已经无条件优先返回（包括压队友），这里的例外只处理“队友还远、对手快跑完”
+    // 的残局兜底，对手剩 2 张也允许抢。
     if (myTeam === baseTeam) {
-        if (baseHandCnt >= 3 && oppMin <= 1) {
+        if (baseHandCnt >= 3 && oppMin <= 2) {
             var finishPlay = all.filter(function(cs){
                 return cs.length === hand.length;
             })[0];
@@ -2333,21 +2419,9 @@ function ai_follow_solo(g, name, base) {
         return null;
     }
 
-    // 认不出阵营（隐藏地主模式）：只在"这手牌能收回牌权或能收口"时才动手，
-    // 否则过牌，避免农民之间互相乱压
-    if (baseTeam === 'U' && hand.length > 2 && oppMin > 1) {
-        var unk = unkByRankOf(g, name), topKey = -1;
-        for (var rt2 in unk) {
-            if (RANK_VAL[rt2] > topKey) topKey = RANK_VAL[rt2];
-        }
-        var cheapWin = all.filter(function(cs){
-            if (cs.length === hand.length) return true;             // 能一把走完
-            var mx = cs.slice().sort(function(x,y){ return strength(y)-strength(x); })[0];
-            return RANK_VAL[mx.slice(1)] >= topKey && topKey >= 0;   // 压完还是场上最大
-        });
-        if (cheapWin.length === 0) return null;
-        all = cheapWin;
-    }
+    // 认不出阵营（隐藏地主模式）交给正常评分：队友和地主都是 'U'，
+    // 按"其他人都还有大牌"过滤会让农民几乎永远不出牌，反而把牌权全让给地主。
+    // scorePass 对 'U' 保持中立，评分会按手数和牌型自己决定压不压。
 
     var scored = all.map(function(cs){
         return { cards: cs, score: scoreCandidate(g, name, cs, base, false) };
@@ -2459,6 +2533,7 @@ function solo_settle(g) {
 }
 
 function start_new_game_solo() {
+    _unkCache.key = null; _unkCache.byRank = null;
     selectedIds = {}; selectedCount = 0;
     handDrag.el = null; handDrag.pointerId = null; handDrag.active = false; handDrag.suppressClick = false;
     handOrderIds = [];
@@ -2550,16 +2625,33 @@ function start_new_game_solo() {
                 }
                 if (ok) straight_pot++;
             }
-            var power = big_cnt * 3 + bomb_cnt * 20 + straight_pot * 8;
+            // 手数、散单、同花潜力一起评估：只看大牌和顺子会把一堆散牌也当地主。
+            var hc = estimateHandCount(lhand);
+            var single_cnt = 0;
+            for (var rk1 in rc) { if (rc[rk1] === 1) single_cnt++; }
+            var suit_cnt = {};
+            for (var ci2=0; ci2<lhand.length; ci2++) {
+                var su = lhand[ci2][0];
+                suit_cnt[su] = (suit_cnt[su] || 0) + 1;
+            }
+            var suit_max = 0;
+            for (var su2 in suit_cnt) { if (suit_cnt[su2] > suit_max) suit_max = suit_cnt[su2]; }
+            // 手数权重不能盖过大牌：13 张一手只要 5 手、但没 A/2/3 也压不住三个农民。
+            // hc 权重 6 + 大牌权重 3，光凭手数（hc=5 → 30 分）到不了叫地主线。
+            var power = (10 - hc) * 6 + big_cnt * 3 + bomb_cnt * 8;
+            power += Math.min(straight_pot, 2) * 4;      // 顺子窗口重叠严重，封顶避免虚高
+            if (suit_max >= 5) power += 6;               // 同花潜力
+            else if (suit_max === 4) power += 2;
+            power -= Math.max(0, single_cnt - 4) * 4;    // 散单太多扣分
 
-            if (power >= 20) {
+            if (power >= 40) {
                 // 手牌中上 → 叫地主搏 +12
                 G.choice = 'call';
                 G.landlord_public = true;
                 G.phase = "play";
                 // 🔥 电脑叫地主：中间弹出“地主”，停留两秒后飞向地主座位
                 showLandlordBadge(G.landlord);
-            } else if (power <= 5) {
+            } else if (power <= 11) {
                 // 手牌烂 → 弃牌小输
                 G.choice = 'fold';
                 solo_settle(G);
