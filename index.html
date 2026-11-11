@@ -6,7 +6,7 @@
 <title>新会寻鸡笼</title>
 <style>
 /* 默认桌面端尺寸 */
-:root { --hand-w: 105px; --hand-overlap: -45px; --opp-w: 50px; --trick-w: 140px; --myzone-h: 215px; }
+:root { --hand-w: 105px; --hand-overlap: -45px; --opp-w: 50px; --trick-w: 140px; --myzone-h: 215px; --open-w: 72px; --open-cols: 4; }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
 html,body { width:100%; height:100%; overflow:hidden; font-family:"Microsoft YaHei","SimHei","PingFang SC",sans-serif; background:#1f6f4a; color:#fff; }
 img { -webkit-user-drag:none; }
@@ -493,8 +493,22 @@ input, button { outline:none; }
 .seat .opp-hand { margin-top:2px; display:flex; justify-content:center; }
 .seat .opp-hand img { width:var(--opp-w, 50px); height:calc(var(--opp-w, 50px) * 1.4); margin-left:calc(var(--opp-w, 50px) * -0.35); border-radius: 4px; box-shadow:0 2px 6px rgba(0,0,0,0.5); }
 .seat .opp-hand img:first-child { margin-left: 0; }
-/* 结算亮牌：原来背着的牌原地翻开，用更小的牌面避免占满牌桌 */
-.seat .opp-hand.open img { width:calc(var(--opp-w, 50px) * 0.58); height:calc(var(--opp-w, 50px) * 0.58 * 1.4); margin-left:calc(var(--opp-w, 50px) * -0.3); border-radius:3px; border:1px solid rgba(0,0,0,0.35); }
+/* 结算亮牌：原来背着的牌原地翻开，放大到能看清，并按座位宽度自动换行 */
+.seat .opp-hand.open {
+    flex-wrap:wrap; align-content:flex-start; justify-content:center;
+    gap:4px; width:max-content;
+    max-width:calc(var(--open-w, 72px) * var(--open-cols, 4) + 16px);
+}
+.seat .opp-hand.open img {
+    width:var(--open-w, 72px); height:calc(var(--open-w, 72px) * 1.4);
+    margin-left:0; border-radius:5px;
+    border:1px solid rgba(0,0,0,0.4); box-shadow:0 3px 8px rgba(0,0,0,0.55);
+}
+/* 正上方这家空间最宽，13 张可以排成一行；略小一点避免压住两侧玩家的名字 */
+#seat-2 .opp-hand.open { max-width:92vw; }
+#seat-2 .opp-hand.open img { width:calc(var(--open-w, 72px) * 0.8); height:calc(var(--open-w, 72px) * 0.8 * 1.4); }
+/* 结算时亮出的牌压在出牌区上面，避免被最后手牌挡住 */
+body.settle-reveal .seat { z-index:30; }
 
 #trick-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); min-width:330px; z-index:15; text-align:center; }
 #trick-center::before {
@@ -687,9 +701,19 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
         --opp-w: 35px;           
         --trick-w: 70px;         
         --myzone-h: 170px;       
+        --open-w: 42px; --open-cols: 4;
     }
     #seat-2 { top: 2px; }
     .seat .opp-hand img { width: var(--opp-w); height: calc(var(--opp-w) * 1.4); }
+    /* 结算时两边座位下移，给正上家的亮牌让出空间 */
+    body.settle-reveal #seat-1, body.settle-reveal #seat-3 { top: 40%; }
+    /* 正上家亮牌改成叠放单行，13 张也不会压到两边的名字 */
+    #seat-2 .opp-hand.open { flex-wrap: nowrap; max-width: calc(100vw - 16px); }
+    #seat-2 .opp-hand.open img {
+        width: min(var(--open-w), calc((100vw - 24px) / 8));
+        height: auto; margin-left: -18px;
+    }
+    #seat-2 .opp-hand.open img:first-child { margin-left: 0; }
     #my-hand { top: 15px; }
     #my-hand img.sel { transform: translateY(-15px); box-shadow: 0 5px 15px rgba(0,0,0,0.6); }
     #topbar .score-chip .landlord-tag { display: none; }
@@ -698,6 +722,7 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
 
 @media (max-width: 900px) {
     #btn-orient { display: inline-block; }
+    body.settle-reveal #btn-orient { display: none; }
 }
 
 @media (max-width: 900px) and (orientation: landscape) {
@@ -707,6 +732,7 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
         --opp-w: 35px;
         --trick-w: 70px;
         --myzone-h: 150px;
+        --open-w: 38px; --open-cols: 6;
     }
     #table { top: 40px; bottom: var(--myzone-h); }
     #my-hand { top: 5px; }
@@ -714,6 +740,7 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
     #history-panel { width: 140px; max-height: calc(50% - 44px); right: 2px; bottom: 6px; }
     #seat-1 { right: 5px; top: 50%; }
     #seat-3 { left: 5px; top: 50%; }
+    #seat-2 .opp-hand.open img { width: var(--open-w); height: calc(var(--open-w) * 1.4); }
     .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
     #btn-orient { display: none; }
 }
@@ -725,7 +752,9 @@ body.force-rotate {
     --opp-w: 35px;
     --trick-w: 70px;
     --myzone-h: 150px;
+    --open-w: 38px; --open-cols: 6;
 }
+body.force-rotate #seat-2 .opp-hand.open img { width: var(--open-w); height: calc(var(--open-w) * 1.4); }
 body.force-rotate #screen-game,
 body.force-rotate .dialog-overlay {
     position: fixed;
@@ -3008,6 +3037,7 @@ function renderAllSingle(tempG) {
     }
     
     var revealOpen = (tempG.phase === 'ended' && !(tempG.team_mode === "1v3" && tempG.choice === 'fold'));
+    document.body.classList.toggle('settle-reveal', revealOpen);
     for(var i=0; i<4; i++) {
         var visualPos = (i - 0 + 4) % 4; 
         var box = $('seat-' + visualPos);
@@ -3571,6 +3601,7 @@ function renderAll() {
         }
     }
     
+    var revealShown = false;
     for(var i=0; i<4; i++) {
         var visualPos = (i - mySeat + 4) % 4; 
         var box = $('seat-' + visualPos);
@@ -3588,8 +3619,10 @@ function renderAll() {
         // 结算亮牌后 G.hands[i] 里是真实牌面，直接原地翻开
         var faceCards = null;
         if (i !== mySeat && G.hands[i] && G.hands[i][0] && G.hands[i][0].id) faceCards = G.hands[i];
+        if (faceCards) revealShown = true;
         setSeatBox(box, plateHtml, mySeat + '|' + i + '|' + G.players[i] + '|' + cnt + '|' + isOnline + '|' + isLL, G.turn === i, i !== mySeat ? cnt : 0, faceCards);
     }
+    document.body.classList.toggle('settle-reveal', revealShown);
     
     var el = $('trick-center'); var stat = $('trick-status');
     var statHtml;
