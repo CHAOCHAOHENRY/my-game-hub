@@ -1026,7 +1026,6 @@ var bgmAudio = null;
 
 // 🔥 随机音效变体表：key=逻辑名，value=实际可用的音频文件名列表
 var SOUND_VARIANTS = {
-    play: ['play', 'play2', 'play3', 'play4'],   // 出牌：4 种随机
     pass: ['pass', 'pass2']                       // 过牌：2 种随机
 };
 
@@ -1043,6 +1042,81 @@ function playSound(name) {
         audioCache[actualName].currentTime = 0;
         audioCache[actualName].play().catch(e => console.log("音频未加载或未交互:", actualName));
     } catch(e){}
+}
+
+// 🔥 出牌报牌：粤语女声按牌型依次播放（sounds/yue/）
+// 花色对应：黑桃=葵扇(全葵)、梅花(全花)、红桃(全痕)、方块(全角)
+var SUIT_VOICE = { s:'flush_s', c:'flush_c', h:'flush_h', d:'flush_d' };
+var cardVoiceToken = 0;
+var cardVoiceAudios = [];
+
+function stopCardVoice() {
+    cardVoiceToken++;
+    for (var i = 0; i < cardVoiceAudios.length; i++) {
+        try { cardVoiceAudios[i].pause(); cardVoiceAudios[i].currentTime = 0; } catch(e){}
+    }
+    cardVoiceAudios = [];
+}
+
+function playVoiceQueue(names) {
+    if (!names || !names.length) return;
+    stopCardVoice();
+    var token = cardVoiceToken;
+    var idx = 0;
+    function step() {
+        if (token !== cardVoiceToken || idx >= names.length) return;
+        var key = 'yue/' + names[idx];
+        var a = audioCache[key];
+        if (!a) {
+            a = new Audio('sounds/' + key + '.mp3');
+            audioCache[key] = a;
+        }
+        cardVoiceAudios.push(a);
+        try { a.currentTime = 0; } catch(e){}
+        var advanced = false;
+        function next() {
+            if (advanced) return;
+            advanced = true;
+            idx++;
+            setTimeout(step, 30);
+        }
+        a.onended = next;
+        a.onerror = next;
+        var pr = a.play();
+        if (pr && pr.catch) pr.catch(next);
+        setTimeout(next, 1800); // 个别机型不触发 ended 时兜底
+    }
+    step();
+}
+
+function cardVoiceNames(p, cards) {
+    if (!p) return null;
+    var names = null;
+    if (p.type === 'single') names = [p.r, 'zai'];
+    else if (p.type === 'pair') names = ['pair', p.r];
+    else if (p.type === 'triple') names = ['triple', p.r];
+    else if (p.type === 'full') names = [p.r, 'hu'];
+    else if (p.type === 'bomb') names = [p.r, 'long'];
+    else if (p.type === 'flush') names = SUIT_VOICE[p.s] ? [SUIT_VOICE[p.s]] : null;
+    else if (p.type === 'sf') names = ['sf'];
+    else if (p.type === 'straight') {
+        // 按顺子本身的先后读，A2345 也读 A 2 3 4 5
+        var set = {};
+        (cards || []).forEach(function(c){ set[c.slice(1)] = 1; });
+        var seq = null;
+        for (var i = 0; i < STRAIGHT_TABLE.length; i++) {
+            var t = STRAIGHT_TABLE[i], ok = true;
+            for (var j = 0; j < t.length; j++) if (!set[t[j]]) { ok = false; break; }
+            if (ok) { seq = t; break; }
+        }
+        names = (seq || (cards || []).map(function(c){ return c.slice(1); })).slice();
+    }
+    return names;
+}
+
+function playCardVoice(p, cards) {
+    var names = cardVoiceNames(p, cards);
+    if (names) playVoiceQueue(names);
 }
 
 // 🔥 BGM 随机池：每次刷新页面随机挑一首
@@ -1106,7 +1180,9 @@ function preloadAssets() {
     imgList.push(titleBgSrc);
     
     // 加载页只等卡牌图片；短音效后台加载，BGM 首次点击时按需创建
-    var audioList = ['click','play','play2','play3','play4','pass','pass2','win','lose'];
+    var audioList = ['click','pass','pass2','win','lose'];
+    ['2','3','4','5','6','7','8','9','10','J','Q','K','A'].forEach(function(r){ audioList.push('yue/' + r); });
+    ['zai','pair','triple','hu','long','sf','flush_s','flush_c','flush_h','flush_d'].forEach(function(n){ audioList.push('yue/' + n); });
     totalAssets = imgList.length;
     preloadCount = 0;
 
@@ -2810,7 +2886,7 @@ function checkSoloAITurn() {
             G.pass_count = 0;
             G.trick_leader = currSeat;
             G.history.push({type: "play", seat: currSeat, cards: cards});
-            playSound('play');
+            playCardVoice(p, cards);
             
             if (hand.length === 0 && G.rankings.indexOf(name) === -1) {
                 G.rankings.push(name);
@@ -2865,7 +2941,7 @@ function soloHumanPlay() {
     G.pass_count = 0;
     G.trick_leader = 0;
     G.history.push({type:"play", seat:0, cards:cards});
-    playSound('play');
+    playCardVoice(p, cards);
     
     if (hand.length === 0 && G.rankings.indexOf(soloMyName) === -1) {
         G.rankings.push(soloMyName);
@@ -3214,7 +3290,7 @@ function doSync() {
                 var newHistLen = data.game.history ? data.game.history.length : 0;
                 if (newHistLen > oldHistLen) {
                     var lastAction = data.game.history[newHistLen - 1];
-                    if (lastAction.type === 'play') playSound('play');
+                    if (lastAction.type === 'play') playCardVoice(analyze(lastAction.cards), lastAction.cards);
                     else if (lastAction.type === 'pass') playSound('pass');
                 }
 
