@@ -1049,11 +1049,72 @@ function playSound(name) {
 var SUIT_VOICE = { s:'flush_s', c:'flush_c', h:'flush_h', d:'flush_d' };
 var cardVoiceToken = 0;
 var cardVoiceAudios = [];
+var VOICE_LEAD = 0.015, VOICE_TAIL = 0.03; // 录音首尾静音去掉后保留的余量
+
+var voiceCtx = null;
+var voiceBufferCache = {};
+var voicesPreloading = false;
+
+function getVoiceCtx() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!voiceCtx) voiceCtx = new AC();
+    if (voiceCtx.state === 'suspended' && voiceCtx.resume) voiceCtx.resume();
+    return voiceCtx;
+}
+
+// 录音首尾各有约 0.1s/0.32s 静音，直接串会拖出明显停顿，这里裁掉只留一点余量
+function trimVoiceBuffer(buf) {
+    var sr = buf.sampleRate, n = buf.length, ch = buf.getChannelData(0);
+    var th = 0.012;
+    var head = 0;
+    while (head < n && Math.abs(ch[head]) < th) head++;
+    if (head >= n) return buf;
+    var tail = n - 1;
+    while (tail > head && Math.abs(ch[tail]) < th) tail--;
+    var start = Math.max(0, head - Math.round(sr * VOICE_LEAD));
+    var end = Math.min(n, tail + Math.round(sr * VOICE_TAIL));
+    if (end - start >= n) return buf;
+    var out = voiceCtx.createBuffer(buf.numberOfChannels, end - start, sr);
+    for (var c = 0; c < buf.numberOfChannels; c++) {
+        out.getChannelData(c).set(buf.getChannelData(c).subarray(start, end));
+    }
+    return out;
+}
+
+function loadVoiceBuffer(name) {
+    if (voiceBufferCache[name]) return voiceBufferCache[name];
+    var ctx = getVoiceCtx();
+    if (!ctx || !window.fetch) return Promise.resolve(null);
+    voiceBufferCache[name] = fetch('sounds/yue/' + name + '.mp3')
+        .then(function(r){ if (!r.ok) throw new Error('voice 404'); return r.arrayBuffer(); })
+        .then(function(ab){ return new Promise(function(res, rej){ ctx.decodeAudioData(ab, res, rej); }); })
+        .then(function(buf){ return trimVoiceBuffer(buf); })
+        .catch(function(){ return null; });
+    return voiceBufferCache[name];
+}
+
+var VOICE_NAMES = ['2','3','4','5','6','7','8','9','10','J','Q','K','A',
+                   'zai','pair','triple','hu','long','sf','flush_s','flush_c','flush_h','flush_d'];
+
+function preloadCardVoices() {
+    if (voicesPreloading) return;
+    voicesPreloading = true;
+    VOICE_NAMES.forEach(function(n){ loadVoiceBuffer(n); });
+}
+
+// 首次触摸时创建并解锁音频上下文，提前解码，之后出牌报牌就没有等待
+document.addEventListener('pointerdown', function(){ getVoiceCtx(); preloadCardVoices(); }, { once: true });
+document.addEventListener('touchstart', function(){ getVoiceCtx(); preloadCardVoices(); }, { once: true });
 
 function stopCardVoice() {
     cardVoiceToken++;
     for (var i = 0; i < cardVoiceAudios.length; i++) {
-        try { cardVoiceAudios[i].pause(); cardVoiceAudios[i].currentTime = 0; } catch(e){}
+        var a = cardVoiceAudios[i];
+        try {
+            if (a.stop) a.stop();
+            else { a.pause(); a.currentTime = 0; }
+        } catch(e){}
     }
     cardVoiceAudios = [];
 }
@@ -1061,7 +1122,27 @@ function stopCardVoice() {
 function playVoiceQueue(names) {
     if (!names || !names.length) return;
     stopCardVoice();
+    preloadCardVoices();
     var token = cardVoiceToken;
+    Promise.all(names.map(loadVoiceBuffer)).then(function(bufs) {
+        if (token !== cardVoiceToken) return;
+        var ok = bufs.every(function(b){ return !!b; });
+        var ctx = ok ? getVoiceCtx() : null;
+        if (!ctx) { playVoiceQueueFallback(names, token); return; }
+        // 裁剪后按采样点无缝首尾相接，中间不留空隙
+        var t = ctx.currentTime + 0.01;
+        bufs.forEach(function(b) {
+            var src = ctx.createBufferSource();
+            src.buffer = b;
+            src.connect(ctx.destination);
+            src.start(t);
+            t += b.duration;
+            cardVoiceAudios.push(src);
+        });
+    });
+}
+
+function playVoiceQueueFallback(names, token) {
     var idx = 0;
     function step() {
         if (token !== cardVoiceToken || idx >= names.length) return;
@@ -1078,13 +1159,13 @@ function playVoiceQueue(names) {
             if (advanced) return;
             advanced = true;
             idx++;
-            setTimeout(step, 30);
+            setTimeout(step, 0);
         }
         a.onended = next;
         a.onerror = next;
         var pr = a.play();
         if (pr && pr.catch) pr.catch(next);
-        setTimeout(next, 1800); // 个别机型不触发 ended 时兜底
+        setTimeout(next, 1800);
     }
     step();
 }
