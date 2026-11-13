@@ -268,7 +268,7 @@ input, button { outline:none; }
     -webkit-text-fill-color:transparent; color:#ffe98a;
     filter:drop-shadow(0 2px 0 rgba(80,40,0,.55)) drop-shadow(0 0 14px rgba(255,200,90,.28));
 }
-.lobby-header::after { content:'VIP 包厢 · 4 张牌桌 · 好运常在'; display:block; margin-top:6px; font-size:11px; letter-spacing:.24em; color:rgba(255,228,170,.5); }
+.lobby-header::after { content:'VIP 包厢 · 20 张牌桌 · 好运常在'; display:block; margin-top:6px; font-size:11px; letter-spacing:.24em; color:rgba(255,228,170,.5); }
 .user-info {
     background:linear-gradient(180deg,rgba(58,32,16,.95),rgba(20,10,6,.95));
     padding:6px 18px; border-radius:999px; border:1px solid rgba(255,214,120,.45);
@@ -601,6 +601,96 @@ body.settle-reveal .seat { z-index:30; }
 @media (max-width: 640px) {
     #gameover-dialog { align-items: flex-end; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
     #gameover-dialog .dialog-box { margin-top: 0; width: 92vw; box-sizing: border-box; }
+}
+
+/* 离开牌桌确认弹窗：沿用牌桌墨绿+描金画风 */
+#confirm-dialog { z-index: 1300; background: rgba(0,0,0,0.55); }
+#confirm-dialog .dialog-box {
+    width: 380px; max-width: 88vw; min-width: 0;
+    margin-top: 0;
+    padding: 0;
+    background: radial-gradient(130% 120% at 50% -20%, #3a7a58 0%, #235240 45%, #163a29 100%);
+    border: 2px solid #f0d68a;
+    border-radius: 16px;
+    box-shadow: 0 0 0 3px #6d4f1d, 0 0 0 5px #f7e9b0, 0 0 0 7px #5d4318, 0 22px 48px rgba(0,0,0,0.78), inset 0 0 46px rgba(0,0,0,0.35);
+    animation: popIn 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    overflow: hidden;
+}
+#confirm-dialog .confirm-head {
+    padding: 22px 22px 0;
+    background: radial-gradient(90% 150% at 50% -35%, rgba(255,226,150,0.3), transparent 62%);
+}
+#confirm-dialog .confirm-icon {
+    width: 48px; height: 48px; margin: 0 auto 10px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    font: 900 30px/1 Georgia, "Times New Roman", serif;
+    color: #5c1212;
+    background: radial-gradient(circle at 35% 28%, #ffe6b0, #f0b74c 56%, #b9791d);
+    border: 2px solid #6d4f1d;
+    box-shadow: 0 0 0 2px #f7e9b0, 0 6px 14px rgba(0,0,0,0.45), inset 0 2px 4px rgba(255,255,255,0.6);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.35);
+}
+#confirm-dialog h2 {
+    margin: 0;
+    color: #ffe98a;
+    font-size: 22px;
+    letter-spacing: 4px;
+    text-shadow: 0 2px 0 #6b4a12, 0 0 14px rgba(255,215,94,0.4);
+}
+#confirm-dialog .confirm-rule {
+    width: 74%; height: 1px; margin: 12px auto 14px;
+    background: linear-gradient(90deg, transparent, #f0d68a 20%, #fff3c4 50%, #f0d68a 80%, transparent);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.35);
+}
+#confirm-dialog .confirm-msg {
+    margin: 0 0 20px;
+    padding: 0 24px;
+    color: #eaf4e4;
+    font-size: 15px;
+    line-height: 1.75;
+    letter-spacing: 0.5px;
+}
+#confirm-dialog .confirm-note {
+    color: #ffc0b6;
+    font-weight: 900;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+#confirm-dialog .confirm-actions {
+    display: flex;
+    gap: 12px;
+    padding: 0 22px 22px;
+}
+#confirm-dialog .confirm-actions button {
+    flex: 1 1 0;
+    width: auto;
+    margin: 0;
+    padding: 11px 0;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    border: 1px solid rgba(255,244,205,0.55);
+    cursor: pointer;
+}
+#confirm-dialog .btn-cancel {
+    background: linear-gradient(180deg, #e2ece0, #aac5a6 48%, #7b976f);
+    color: #20341d;
+    box-shadow: 0 3px 0 #4b6344, inset 0 1px 0 rgba(255,255,255,0.5);
+}
+#confirm-dialog .btn-leave {
+    background: linear-gradient(180deg, #ffb7ac, #e56a58 48%, #b23a2c);
+    color: #3d0c0c;
+    box-shadow: 0 3px 0 #7d241a, inset 0 1px 0 rgba(255,255,255,0.45);
+}
+#confirm-dialog .confirm-actions button:active { transform: translateY(2px); box-shadow: 0 1px 0 #4b6344; }
+@media (max-width: 640px) {
+    #confirm-dialog .confirm-head { padding: 18px 16px 0; }
+    #confirm-dialog h2 { font-size: 19px; letter-spacing: 3px; }
+    #confirm-dialog .confirm-msg { font-size: 14px; padding: 0 18px; margin-bottom: 16px; }
+    #confirm-dialog .confirm-actions { padding: 0 16px 16px; gap: 10px; }
+    #confirm-dialog .confirm-actions button { padding: 10px 0; font-size: 14px; }
+    #confirm-dialog .confirm-icon { width: 42px; height: 42px; font-size: 26px; }
 }
 
 /* 奖品池专属弹窗样式 */
@@ -955,12 +1045,24 @@ body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
           <span>累计积分：<b id="lobby-user-score" style="color:#ffd75e;">0</b></span>
       </div>
   </div>
-  <div class="table-grid">
-      <div class="single-table"><div class="table-title">1 号桌</div><div class="table-chips tc-l" aria-hidden="true"><i></i><i></i><i></i></div><div class="table-chips tc-r" aria-hidden="true"><i></i><i></i></div><div class="seat-btn seat-top" data-t="1" data-s="0">空位</div><div class="seat-btn seat-right" data-t="1" data-s="1">空位</div><div class="seat-btn seat-bottom" data-t="1" data-s="2">空位</div><div class="seat-btn seat-left" data-t="1" data-s="3">空位</div></div>
-      <div class="single-table"><div class="table-title">2 号桌</div><div class="table-chips tc-l" aria-hidden="true"><i></i><i></i><i></i></div><div class="table-chips tc-r" aria-hidden="true"><i></i><i></i></div><div class="seat-btn seat-top" data-t="2" data-s="0">空位</div><div class="seat-btn seat-right" data-t="2" data-s="1">空位</div><div class="seat-btn seat-bottom" data-t="2" data-s="2">空位</div><div class="seat-btn seat-left" data-t="2" data-s="3">空位</div></div>
-      <div class="single-table"><div class="table-title">3 号桌</div><div class="table-chips tc-l" aria-hidden="true"><i></i><i></i><i></i></div><div class="table-chips tc-r" aria-hidden="true"><i></i><i></i></div><div class="seat-btn seat-top" data-t="3" data-s="0">空位</div><div class="seat-btn seat-right" data-t="3" data-s="1">空位</div><div class="seat-btn seat-bottom" data-t="3" data-s="2">空位</div><div class="seat-btn seat-left" data-t="3" data-s="3">空位</div></div>
-      <div class="single-table"><div class="table-title">4 号桌</div><div class="table-chips tc-l" aria-hidden="true"><i></i><i></i><i></i></div><div class="table-chips tc-r" aria-hidden="true"><i></i><i></i></div><div class="seat-btn seat-top" data-t="4" data-s="0">空位</div><div class="seat-btn seat-right" data-t="4" data-s="1">空位</div><div class="seat-btn seat-bottom" data-t="4" data-s="2">空位</div><div class="seat-btn seat-left" data-t="4" data-s="3">空位</div></div>
-  </div>
+  <div class="table-grid" id="table-grid"></div>
+  <script>
+  (function () {
+      var grid = document.getElementById('table-grid');
+      var seatPos = [['seat-top', 0], ['seat-right', 1], ['seat-bottom', 2], ['seat-left', 3]];
+      var html = '';
+      for (var t = 1; t <= 20; t++) {
+          html += '<div class="single-table"><div class="table-title">' + t + ' 号桌</div>' +
+              '<div class="table-chips tc-l" aria-hidden="true"><i></i><i></i><i></i></div>' +
+              '<div class="table-chips tc-r" aria-hidden="true"><i></i><i></i></div>';
+          for (var i = 0; i < seatPos.length; i++) {
+              html += '<div class="seat-btn ' + seatPos[i][0] + '" data-t="' + t + '" data-s="' + seatPos[i][1] + '">空位</div>';
+          }
+          html += '</div>';
+      }
+      grid.innerHTML = html;
+  })();
+  </script>
   <button id="btn-start-game" class="hidden">开始游戏</button>
 </div>
 
@@ -1016,6 +1118,22 @@ body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
     </div>
 </div>
 
+<!-- 🔥 离开牌桌确认弹窗 -->
+<div id="confirm-dialog" class="dialog-overlay hidden">
+    <div class="dialog-box" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div class="confirm-head">
+            <div class="confirm-icon">!</div>
+            <h2 id="confirm-title">离开牌桌</h2>
+            <div class="confirm-rule"></div>
+        </div>
+        <p class="confirm-msg" id="confirm-msg"></p>
+        <div class="confirm-actions">
+            <button type="button" class="btn-cancel" id="confirm-cancel">取消</button>
+            <button type="button" class="btn-leave" id="confirm-ok">确定离开</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ================= 🔥 核心配置区 🔥 =================
 var API_BASE = 'https://game.chaochaoddzhenry2026.dpdns.org'; // 填你刚刚弄好的后端地址
@@ -1049,7 +1167,8 @@ function playSound(name) {
 var SUIT_VOICE = { s:'flush_s', c:'flush_c', h:'flush_h', d:'flush_d' };
 var cardVoiceToken = 0;
 var cardVoiceAudios = [];
-var VOICE_LEAD = 0.015, VOICE_TAIL = 0.03; // 录音首尾静音去掉后保留的余量
+var VOICE_LEAD = 0.01, VOICE_TAIL = 0.02; // 录音首尾静音去掉后保留的余量
+var VOICE_OVERLAP = 0.06; // 相邻两段允许重叠的时长，盖住下一个字的起音气声，听起来连贯不停顿
 
 var voiceCtx = null;
 var voiceBufferCache = {};
@@ -1082,16 +1201,28 @@ function trimVoiceBuffer(buf) {
     return out;
 }
 
-function loadVoiceBuffer(name) {
-    if (voiceBufferCache[name]) return voiceBufferCache[name];
+function fetchVoiceBuffer(name, attempt) {
     var ctx = getVoiceCtx();
     if (!ctx || !window.fetch) return Promise.resolve(null);
-    voiceBufferCache[name] = fetch('sounds/yue/' + name + '.mp3')
+    return fetch('sounds/yue/' + name + '.mp3')
         .then(function(r){ if (!r.ok) throw new Error('voice 404'); return r.arrayBuffer(); })
         .then(function(ab){ return new Promise(function(res, rej){ ctx.decodeAudioData(ab, res, rej); }); })
         .then(function(buf){ return trimVoiceBuffer(buf); })
-        .catch(function(){ return null; });
-    return voiceBufferCache[name];
+        .catch(function(){
+            // 偶发解码/网络失败重试一次，避免个别牌永久退化成有停顿的播放方式
+            if (attempt < 1) return fetchVoiceBuffer(name, attempt + 1);
+            return null;
+        });
+}
+
+function loadVoiceBuffer(name) {
+    if (voiceBufferCache[name]) return voiceBufferCache[name];
+    var p = fetchVoiceBuffer(name, 0).then(function(buf) {
+        if (!buf) delete voiceBufferCache[name];
+        return buf;
+    });
+    voiceBufferCache[name] = p;
+    return p;
 }
 
 var VOICE_NAMES = ['2','3','4','5','6','7','8','9','10','J','Q','K','A',
@@ -1100,7 +1231,13 @@ var VOICE_NAMES = ['2','3','4','5','6','7','8','9','10','J','Q','K','A',
 function preloadCardVoices() {
     if (voicesPreloading) return;
     voicesPreloading = true;
-    VOICE_NAMES.forEach(function(n){ loadVoiceBuffer(n); });
+    // 逐个解码：iOS 同时解码二十多个文件时可能个别失败
+    var i = 0;
+    function next() {
+        if (i >= VOICE_NAMES.length) return;
+        loadVoiceBuffer(VOICE_NAMES[i++]).then(next);
+    }
+    next();
 }
 
 // 首次触摸时创建并解锁音频上下文，提前解码，之后出牌报牌就没有等待
@@ -1129,14 +1266,14 @@ function playVoiceQueue(names) {
         var ok = bufs.every(function(b){ return !!b; });
         var ctx = ok ? getVoiceCtx() : null;
         if (!ctx) { playVoiceQueueFallback(names, token); return; }
-        // 裁剪后按采样点无缝首尾相接，中间不留空隙
+        // 裁剪后首尾相接，并让后一段稍微提前咬住前一段的尾音，避免换字时出现空档
         var t = ctx.currentTime + 0.01;
         bufs.forEach(function(b) {
             var src = ctx.createBufferSource();
             src.buffer = b;
             src.connect(ctx.destination);
             src.start(t);
-            t += b.duration;
+            t += b.duration - Math.min(VOICE_OVERLAP, b.duration * 0.4);
             cardVoiceAudios.push(src);
         });
     });
@@ -1176,8 +1313,8 @@ function cardVoiceNames(p, cards) {
     if (p.type === 'single') names = [p.r, 'zai'];
     else if (p.type === 'pair') names = ['pair', p.r];
     else if (p.type === 'triple') names = ['triple', p.r];
-    else if (p.type === 'full') names = [p.r, 'hu'];
-    else if (p.type === 'bomb') names = [p.r, 'long'];
+    else if (p.type === 'full') names = [p.r, 'zai', 'hu'];
+    else if (p.type === 'bomb') names = [p.r, 'zai', 'long'];
     else if (p.type === 'flush') names = SUIT_VOICE[p.s] ? [SUIT_VOICE[p.s]] : null;
     else if (p.type === 'sf') names = ['sf'];
     else if (p.type === 'straight') {
@@ -1216,6 +1353,30 @@ function playBGM() {
     } catch(e){}
 }
 
+// 游戏大厅就显示时开始放背景音乐；浏览器拦截自动播放则等下一次触摸补播
+var lobbyBgmArmed = false;
+function playLobbyBGM() {
+    playBGM();
+    if (lobbyBgmArmed) return;
+    lobbyBgmArmed = true;
+    function unlock() {
+        if (bgmAudio && bgmAudio.paused) playBGM();
+        // 确认真的播起来了再撤掉监听；没播起来说明这次手势不被浏览器认可，继续等下一次
+        setTimeout(function () {
+            if (bgmAudio && !bgmAudio.paused) {
+                document.removeEventListener('pointerdown', unlock, true);
+                document.removeEventListener('touchstart', unlock, true);
+                document.removeEventListener('touchend', unlock, true);
+                document.removeEventListener('click', unlock, true);
+            }
+        }, 250);
+    }
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('touchstart', unlock, true);
+    document.addEventListener('touchend', unlock, true);
+    document.addEventListener('click', unlock, true);
+}
+
 // 开场底图：新会六处地标水彩画，每次进入随机抽一张
 var TITLE_BG_LIST = ['title/bg1.jpg','title/bg2.jpg','title/bg3.jpg','title/bg4.jpg','title/bg5.jpg','title/bg6.jpg'];
 var titleBgSrc = TITLE_BG_LIST[(Math.random() * TITLE_BG_LIST.length) | 0];
@@ -1231,6 +1392,7 @@ function enterMenuDirect() {
     document.getElementById('loading-screen').classList.add('hidden');
     document.getElementById('screen-title').style.display = 'none';
     document.getElementById('screen-menu').style.display = 'flex';
+    playLobbyBGM();
 }
 
 // 加载条淡出前，先把同一张底图无过渡地铺到标题页，避免闪黑
@@ -1260,7 +1422,7 @@ function preloadAssets() {
     
     imgList.push(titleBgSrc);
     
-    // 加载页只等卡牌图片；短音效后台加载，BGM 首次点击时按需创建
+    // 加载页只等卡牌图片；短音效后台加载，BGM 进大厅时按需创建
     var audioList = ['click','pass','pass2','win','lose'];
     ['2','3','4','5','6','7','8','9','10','J','Q','K','A'].forEach(function(r){ audioList.push('yue/' + r); });
     ['zai','pair','triple','hu','long','sf','flush_s','flush_c','flush_h','flush_d'].forEach(function(n){ audioList.push('yue/' + n); });
@@ -1672,7 +1834,14 @@ function startTitleAnimation() {
         setTimeout(function () {
             screen.style.display = 'none';
             document.getElementById('screen-menu').style.display = 'flex';
+            playLobbyBGM();
         }, 1000);
+    }
+
+    // 点击跳过开场动画时顺便借这次用户手势把大厅音乐起起来（iPhone 不允许无手势自动播放）
+    function onTitleTap() {
+        playBGM();
+        finishTitle();
     }
 
     function onResize() {
@@ -1696,12 +1865,12 @@ function startTitleAnimation() {
         drawTitle(1e6);
         drawRule(1e6);
         updateMaker(1e6);
-        screen.addEventListener('click', finishTitle);
+        screen.addEventListener('click', onTitleTap);
         titleAnim.timers.push(setTimeout(finishTitle, 4200));
         return;
     }
 
-    screen.addEventListener('click', finishTitle);
+    screen.addEventListener('click', onTitleTap);
     window.addEventListener('resize', onResize);
 
     titleAnim.timers.push(setTimeout(finishTitle, T_FINISH));
@@ -1826,8 +1995,13 @@ function analyze(cards) {
         }
         if (straight_top) {
             var skey = RANK_VAL[straight_top];
-            if (same_suit) return {type:'sf', key:skey, r:straight_top, s:d[0][0]};
-            return {type:'straight', key:skey, r:straight_top, s:d[0][0]};
+            // 规则：顺子比“最大那张牌”的花色。d 按 strength 排，A2345/23456 的 d[0] 是 3，
+            // 不是顺子顶端（5/6），所以必须按 straight_top 找牌。
+            var topCard = null;
+            for (var ti=0; ti<5; ti++) if (d[ti].slice(1) === straight_top) { topCard = d[ti]; break; }
+            var topSuit = topCard ? topCard[0] : d[0][0];
+            if (same_suit) return {type:'sf', key:skey, r:straight_top, s:topSuit};
+            return {type:'straight', key:skey, r:straight_top, s:topSuit};
         }
         if (same_suit) return {type:'flush', key:strength(d[0]), r:d[0].slice(1), s:d[0][0], seq:d};
         return null;
@@ -3278,29 +3452,12 @@ function doSync() {
         }
         
         var isSeated = false;
-        document.querySelectorAll('.seat-btn').forEach(btn => {
-            btn.innerHTML = '空位';
-            btn.classList.remove('occupied', 'offline', 'me');
-            btn.style.background = ''; btn.style.color = '';
-            btn.removeAttribute('title');
-        });
-        
+        var seatMap = {};
         if (data.seats) {
             for (var t in data.seats) {
                 for (var s in data.seats[t]) {
                     var pInfo = data.seats[t][s];
-                    var btn = document.querySelector(`.seat-btn[data-t="${t}"][data-s="${s}"]`);
-                    if (btn) {
-                        btn.classList.add('occupied');
-                        btn.classList.toggle('offline', !pInfo.online);
-                        if (pInfo.name === myName) btn.classList.add('me');
-                        var initial = String(pInfo.name || '?').trim().charAt(0) || '?';
-                        btn.innerHTML = '<span class="s-avatar">' + initial + '</span>' +
-                            '<span class="s-name">' + pInfo.name + '</span>' +
-                            '<span class="s-score">' + (pInfo.score || 0) + '分</span>' +
-                            '<span class="s-dot"></span>';
-                        btn.title = pInfo.name + ' · ' + (pInfo.online ? '在线' : '电脑');
-                    }
+                    seatMap[t + '_' + s] = pInfo;
                     if (pInfo.name === myName) {
                         isSeated = true;
                         currentTableId = t;
@@ -3310,6 +3467,31 @@ function doSync() {
                 }
             }
         }
+
+        // 80 个座位：只重绘有变化的，避免每次同步全量重建 DOM
+        document.querySelectorAll('.seat-btn').forEach(btn => {
+            var info = seatMap[btn.getAttribute('data-t') + '_' + btn.getAttribute('data-s')];
+            var key = info ? (info.name + '|' + (info.score || 0) + '|' + (info.online ? 1 : 0)) : '';
+            if (btn._seatKey === key) return;
+            btn._seatKey = key;
+            if (!info) {
+                btn.innerHTML = '空位';
+                btn.classList.remove('occupied', 'offline', 'me');
+                btn.removeAttribute('title');
+                return;
+            }
+            var initial = String(info.name || '?').trim().charAt(0) || '?';
+            btn.classList.add('occupied');
+            btn.classList.toggle('offline', !info.online);
+            btn.classList.toggle('me', info.name === myName);
+            btn.textContent = '';
+            var av = document.createElement('span'); av.className = 's-avatar'; av.textContent = initial;
+            var nm = document.createElement('span'); nm.className = 's-name'; nm.textContent = info.name;
+            var sc = document.createElement('span'); sc.className = 's-score'; sc.textContent = (info.score || 0) + '分';
+            var dot = document.createElement('span'); dot.className = 's-dot';
+            btn.appendChild(av); btn.appendChild(nm); btn.appendChild(sc); btn.appendChild(dot);
+            btn.title = info.name + ' · ' + (info.online ? '在线' : '离线');
+        });
         
         var hasMyGame = !!data.game;
         if (!isSeated || hasMyGame || !enteredGame) {
@@ -3867,23 +4049,54 @@ document.getElementById('btn-orient').onclick = function(){
     setForceRotate(!document.body.classList.contains('force-rotate'));
 };
 
+// 中途离开确认：用牌桌风格的弹窗代替浏览器原生 confirm
+var confirmOnOk = null;
+function showGameConfirm(title, msgHtml, okText, onOk) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-msg').innerHTML = msgHtml;
+    document.getElementById('confirm-ok').textContent = okText;
+    confirmOnOk = onOk || null;
+    document.getElementById('confirm-dialog').classList.remove('hidden');
+}
+function hideGameConfirm() {
+    document.getElementById('confirm-dialog').classList.add('hidden');
+    confirmOnOk = null;
+}
+document.getElementById('confirm-cancel').onclick = function() {
+    playSound('click');
+    hideGameConfirm();
+};
+document.getElementById('confirm-ok').onclick = function() {
+    playSound('click');
+    var fn = confirmOnOk;
+    hideGameConfirm();
+    if (fn) fn();
+};
+document.getElementById('confirm-dialog').addEventListener('click', function(e) {
+    if (e.target === this) hideGameConfirm();
+});
+
 document.getElementById('btn-quit').onclick = function(){ 
     playSound('click');
     if (isSoloMode) {
-        if (confirm('确定退出单机模式返回菜单吗？')) {
-            window.location.reload();
-        }
+        showGameConfirm('退出单机模式',
+            '当前对局不会保存。<br><span class="confirm-note">确定返回游戏大厅吗？</span>',
+            '确定退出',
+            function(){ window.location.reload(); });
         return;
     }
-    if(confirm('确定离开吗？离开后由电脑托管，本局将无法重连！')) {
-        var u = document.getElementById('lobby-user-name').textContent;
-        fetch(API_BASE + '/api/leave_game', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, session_id: mySessionId })
-        }).then(() => {
-            window.location.reload();
+    showGameConfirm('离开牌桌',
+        '离开后由电脑托管，<br><span class="confirm-note">本局将无法重连！</span>',
+        '确定离开',
+        function(){
+            var u = document.getElementById('lobby-user-name').textContent;
+            fetch(API_BASE + '/api/leave_game', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, session_id: mySessionId })
+            }).then(() => {
+                window.location.reload();
+            });
         });
-    }
 };
 
 document.getElementById('btn-menu-online').onclick = function() {
