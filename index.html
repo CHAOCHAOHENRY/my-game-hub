@@ -509,6 +509,18 @@ input, button { outline:none; }
 #seat-2 .opp-hand.open img { width:calc(var(--open-w, 72px) * 0.8); height:calc(var(--open-w, 72px) * 0.8 * 1.4); }
 /* 结算时亮出的牌压在出牌区上面，避免被最后手牌挡住 */
 body.settle-reveal .seat { z-index:30; }
+/* 左右两家亮牌：13 张会折成好几行，座位原本是垂直居中，行数一多上半部分会被屏幕顶边切掉。
+   改成从顶部往下排，并多给一列，避免长手牌往下顶出屏幕。 */
+body.settle-reveal #seat-1,
+body.settle-reveal #seat-3 {
+    top: 4px;
+    transform: none;
+}
+body.settle-reveal #seat-1 .opp-hand.open img,
+body.settle-reveal #seat-3 .opp-hand.open img {
+    width: min(var(--open-w, 72px), calc((100vh - 120px) / 4.2));
+    height: calc(min(var(--open-w, 72px), calc((100vh - 120px) / 4.2)) * 1.4);
+}
 
 #trick-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); min-width:330px; z-index:15; text-align:center; }
 #trick-center::before {
@@ -3606,7 +3618,14 @@ function updateGameState(game, myName) {
     G.landlord = game.landlord;
     G.landlord_public = game.landlord_public;
     mySeat = game.my_seat;
-    
+
+    // 换局重新发牌时清掉上一局残留的选中牌，否则新手里出现同一张牌会一直显示为选中
+    var prevHand = G.hands[mySeat] || [];
+    var redealt = (game.my_hand || []).some(function(id){
+        return !prevHand.some(function(c){ return c.id === id; });
+    });
+    if (redealt) { selectedIds = {}; selectedCount = 0; }
+
     for (var i=0; i<4; i++) {
         if (i === mySeat) {
             if (game.my_hand) G.hands[mySeat] = game.my_hand.map(function(id){ return mk(id[0], id.slice(1)); });
@@ -3851,6 +3870,13 @@ function setSeatBox(box, plateHtml, plateSig, isTurn, backCount, faceCards) {
             hand.className = 'opp-hand' + (face ? ' open' : '');
             hand.innerHTML = '';
             if (face) {
+                // 左右两家空间窄：按张数平均分列（最多 5 列），避免最后一行只剩一张孤零零的牌
+                if (box.id === 'seat-1' || box.id === 'seat-3') {
+                    var n = face.length;
+                    hand.style.setProperty('--open-cols', Math.min(5, Math.ceil(n / Math.ceil(n / 5))));
+                } else {
+                    hand.style.removeProperty('--open-cols');
+                }
                 face.slice().sort(function(a,b){ return strength(b.id) - strength(a.id); }).forEach(function(c){
                     var im = document.createElement('img');
                     im.src = img(c.id);
