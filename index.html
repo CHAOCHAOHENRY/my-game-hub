@@ -330,6 +330,10 @@ input, button { outline:none; }
     text-shadow:0 1px 0 rgba(255,255,255,.55); text-align:center;
 }
 .table-title::after { content:'斗地主'; display:block; font-size:8px; letter-spacing:.34em; color:#6b4410; opacity:.72; margin-top:1px; }
+/* 已开局的桌：标题下改为“已开局”，空位锁住不能入座 */
+.single-table.playing .table-title::after { content:'已开局'; color:#a1322a; opacity:1; letter-spacing:.22em; }
+.single-table.playing .seat-btn:not(.occupied) { cursor:not-allowed; opacity:.5; filter:grayscale(.4); color:transparent; }
+.single-table.playing .seat-btn:not(.occupied)::before { content:'×'; font-size:15px; color:#c98c6a; }
 .table-chips { position:absolute; top:64%; z-index:3; width:22px; pointer-events:none; }
 .table-chips i {
     display:block; width:22px; height:22px; border-radius:50%; margin-top:-13px; position:relative;
@@ -1064,7 +1068,7 @@ body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
       var seatPos = [['seat-top', 0], ['seat-right', 1], ['seat-bottom', 2], ['seat-left', 3]];
       var html = '';
       for (var t = 1; t <= 20; t++) {
-          html += '<div class="single-table"><div class="table-title">' + t + ' 号桌</div>' +
+          html += '<div class="single-table" data-table="' + t + '"><div class="table-title">' + t + ' 号桌</div>' +
               '<div class="table-chips tc-l" aria-hidden="true"><i></i><i></i><i></i></div>' +
               '<div class="table-chips tc-r" aria-hidden="true"><i></i><i></i></div>';
           for (var i = 0; i < seatPos.length; i++) {
@@ -1901,6 +1905,7 @@ var currentTableId = null;
 var lastGameStr = "";
 var myDbScore = 0;
 var myRedeemed = {};
+var playingTables = {}; // 正在打牌的桌号（服务端 active_tables），大厅里这些桌不能入座
 
 var isSoloMode = false; // 🔥 是否处于单机模式
 var enteredGame = false; // 本次进入联机后是否已主动坐下/开始，防止登录后被旧牌局拉回牌桌
@@ -3507,6 +3512,14 @@ function doSync() {
             btn.appendChild(av); btn.appendChild(nm); btn.appendChild(sc); btn.appendChild(dot);
             btn.title = info.name + ' · ' + (info.online ? '在线' : '离线');
         });
+
+        // 已开局的桌：标题显示“已开局”，空位锁住（自己的座位仍可点回去继续）
+        var playingSet = {};
+        (data.active_tables || []).forEach(function(t){ playingSet[String(t)] = true; });
+        playingTables = playingSet;
+        document.querySelectorAll('.single-table').forEach(function(tb){
+            tb.classList.toggle('playing', !!playingSet[tb.getAttribute('data-table')]);
+        });
         
         var hasMyGame = !!data.game;
         if (!isSeated || hasMyGame || !enteredGame) {
@@ -4252,6 +4265,10 @@ document.querySelectorAll('.seat-btn').forEach(btn => {
         var s = this.getAttribute('data-s');
         var playerName = document.getElementById('lobby-user-name').textContent;
         if(playerName === '未登录') return;
+        if (playingTables[t] && !this.classList.contains('me')) {
+            showToast('该桌已开局，请选择其他桌');
+            return;
+        }
         
         fetch(API_BASE + '/api/sit', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
