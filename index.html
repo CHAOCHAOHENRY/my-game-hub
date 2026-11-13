@@ -2576,10 +2576,13 @@ function scoreCandidate(g, name, cards, base, isLead) {
             if (ukHigher === 0) score += 900;
             else if (isLead) {
                 // 2v2 有队友兜底，先把只剩 1 张的对手卡死更划算，出的单张越小罚得越重；
-                // 1v3 地主单刀，留住最大那张当唯一回手更值钱，只做均匀重罚。
+                // 1v3 只做均匀重罚，先出哪张交给下面的点数项决定。
                 // 两种赛制的自博弈实测符号相反，所以按 team_mode 分叉。
                 if (g.team_mode === '2v2') score -= 4000 + Math.round(6000 * ukHigher / Math.max(1, ukTotal));
                 else score -= 4000;
+                // 对手只剩 1 张：首出单张一定先打最大的。
+                // 小牌被压对手直接出完，留大牌没有回手机会；大牌被压则小牌同样压不住。
+                score += keyRank * 300;
             } else score -= 1200;
         } else {
             score += 600;
