@@ -855,6 +855,8 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
     /* 左右两家都贴顶部：名字+张数+地主标记在上，牌一行排在下面 */
     #seat-1 { right: 5px; top: 6%; transform: none; }
     #seat-3 { left: 5px; top: 6%; transform: none; }
+    /* 谁出牌的提示贴正左边中部，不压左上那家的名字 */
+    #trick-status { top: 66%; left: 4px; transform: translateY(-50%); }
     #seat-2 .opp-hand.open img { width: var(--open-w); height: calc(var(--open-w) * 1.4); }
     .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
     #btn-orient { display: none; }
@@ -926,6 +928,8 @@ body.force-rotate #history-panel .pass-text { font-size: 9px; }
 /* 左右两家都贴顶部：名字+张数+地主标记在上，牌一行排在下面 */
 body.force-rotate #seat-1 { right: 5px; top: 6%; transform: none; }
 body.force-rotate #seat-3 { left: 5px; top: 6%; transform: none; }
+/* 谁出牌的提示贴正左边中部，不压左上那家的名字 */
+body.force-rotate #trick-status { top: 66%; left: 4px; transform: translateY(-50%); }
 body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
 /* 叫地主弹窗：按钮排一行压扁高度，不再压住手牌 */
 body.force-rotate #landlord-dialog { padding-top: 44px; }
