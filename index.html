@@ -833,10 +833,10 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
 
 @media (max-width: 900px) and (orientation: landscape) {
     :root {
-        /* 横屏手机屏幕矮，但宽度富余：手牌尽量铺满一排，少叠一点、单张更大 */
+        /* 横屏手机屏幕矮，但宽度富余：单张尽量大 */
         --hand-w: clamp(78px, 11.5vw, 104px);
-        /* 常规叠 40%；屏幕太窄时自动加大叠压，保证 13 张不溢出 */
-        --hand-overlap: min(calc(var(--hand-w) * -0.4), calc((100vw - 8px - 13 * var(--hand-w)) / 12));
+        /* 叠压 55%，13 张收成紧凑的一排不横跨整屏；屏幕太窄时再自动加大叠压 */
+        --hand-overlap: min(calc(var(--hand-w) * -0.55), calc((100vw - 8px - 13 * var(--hand-w)) / 12));
         --opp-w: 35px;
         /* 出牌区跟手牌一样大 */
         --trick-w: var(--hand-w);
@@ -858,7 +858,7 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
 body.force-rotate {
     /* 旋转后宽高互换：手牌尺寸看 vh，牌区高度跟着牌高走 */
     --hand-w: clamp(78px, 11.5vh, 104px);
-    --hand-overlap: min(calc(var(--hand-w) * -0.4), calc((100vh - 8px - 13 * var(--hand-w)) / 12));
+    --hand-overlap: min(calc(var(--hand-w) * -0.55), calc((100vh - 8px - 13 * var(--hand-w)) / 12));
     --opp-w: 35px;
     --trick-w: var(--hand-w);
     --myzone-h: calc(var(--hand-w) * 1.4 + 60px);
