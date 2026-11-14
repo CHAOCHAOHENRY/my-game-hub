@@ -281,6 +281,16 @@ input, button { outline:none; }
 /* 奖品池按钮 */
 #btn-prize-pool { position: fixed; top: 20px; right: 20px; background: linear-gradient(#ffd75e,#e8a33d); color:#5c3a00; border:2px solid #fff; padding: 8px 20px; border-radius: 20px; font-weight: bold; z-index: 9999; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
 #btn-lobby-back { position: fixed; top: 20px; left: 20px; background:linear-gradient(#b8473f,#7d2822); color:#fff; border:2px solid #f0d08a; padding: 8px 20px; border-radius: 20px; font-weight: bold; z-index: 9999; box-shadow: 0 4px 10px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,.25); cursor: pointer; }
+/* 音乐开关：只关背景音乐，出牌/过牌等音效不受影响 */
+#btn-music-lobby {
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    background: linear-gradient(#2f6fa8,#1b4a75); color:#fff;
+    border: 2px solid #f0d08a; border-radius: 20px; padding: 8px 14px;
+    font-weight: bold; font-size: 13px; white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.25);
+    cursor: pointer;
+}
+#btn-music-lobby.off { background: linear-gradient(#5c5c5c,#383838); color:#e2e2e2; border-color: rgba(240,208,138,.45); }
 
 .table-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 150px 100px; width: min(900px, 96vw); justify-items:center; margin-bottom: 70px; margin-top: 92px; }
 .single-table {
@@ -462,6 +472,8 @@ input, button { outline:none; }
 #topbar .score-chip .landlord-tag { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: linear-gradient(#e04a3c,#9e1c14); color: #ffe9c0; border:1px solid rgba(255,215,120,0.55); box-shadow:0 0 8px rgba(200,40,30,0.35); }
 #topbar .handno { margin-left:auto; color:#cfe8d0; }
 #btn-quit { margin-left:8px; background:linear-gradient(#c4544a,#8a2822); color:#fff; border:1px solid rgba(255,220,150,0.55); border-radius:999px; padding:4px 12px; font-weight:700; box-shadow:0 2px 6px rgba(0,0,0,0.4); }
+#btn-music-game { margin-left:8px; flex:0 0 auto; white-space:nowrap; background:linear-gradient(#2f6fa8,#1b4a75); color:#fff; border:1px solid rgba(255,220,150,0.55); border-radius:999px; padding:4px 10px; font-weight:700; font-size:12px; box-shadow:0 2px 6px rgba(0,0,0,0.4); }
+#btn-music-game.off { background:linear-gradient(#5c5c5c,#383838); color:#e2e2e2; }
 #btn-orient { display:none; position:absolute; top:50px; right:8px; z-index:46; background:linear-gradient(#2f6fa8,#1b4a75); color:#fff; border:1px solid rgba(255,215,120,0.5); border-radius:999px; padding:5px 12px; white-space:nowrap; font-size:12px; box-shadow:0 3px 8px rgba(0,0,0,0.45); }
 
 #table { position:absolute; top:44px; bottom:var(--myzone-h, 215px); left:0; right:0; }
@@ -783,6 +795,8 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
     
     #btn-prize-pool { position: fixed; top: 15px; right: 10px; padding: 6px 12px; font-size: 12px; z-index: 9999; }
     #btn-lobby-back { position: fixed; top: 15px; left: 10px; padding: 6px 12px; font-size: 12px; z-index: 9999; }
+    #btn-music-lobby { top: 15px; right: 10px; padding: 6px 12px; font-size: 12px; }
+    #btn-music-game { margin-left: 5px; padding: 3px 8px; font-size: 11px; }
 
     .rules-wrap { padding: 15px; border-width: 2px; }
     .rules-header h1 { font-size: 20px; letter-spacing: 2px; }
@@ -1108,6 +1122,7 @@ body.force-rotate #landlord-dialog .landlord-actions button { flex: 1 1 0; width
 </div>
 <div id="screen-lobby">
   <button id="btn-lobby-back">⬅ 返回主菜单</button>
+  <button id="btn-music-lobby">🎵 音乐</button>
   
   <div class="lobby-header">
       <h1>新会寻鸡笼 - 联机</h1>
@@ -1144,6 +1159,7 @@ body.force-rotate #landlord-dialog .landlord-actions button { flex: 1 1 0; width
         <span class="score-chip" id="chip-0"></span><span class="score-chip" id="chip-1"></span><span class="score-chip" id="chip-2"></span><span class="score-chip" id="chip-3"></span>
       </div>
       <button id="btn-quit">离开</button>
+      <button id="btn-music-game">🎵 音乐</button>
   </div>
   <button id="btn-orient">横屏</button>
   <div id="table">
@@ -1413,7 +1429,34 @@ function playCardVoice(p, cards) {
 // 🔥 BGM 随机池：每次刷新页面随机挑一首
 var BGM_LIST = ['bgm', 'bgm2', 'bgm3', 'bgm4'];
 
+// 音乐开关只控制背景音乐，出牌/过牌等音效走各自的 Audio，不受影响
+var BGM_MUTE_KEY = 'bgmMuted';
+var bgmMuted = false;
+try { bgmMuted = localStorage.getItem(BGM_MUTE_KEY) === '1'; } catch(e) {}
+
+function updateBgmButtons() {
+    var ids = ['btn-music-lobby', 'btn-music-game'];
+    for (var i = 0; i < ids.length; i++) {
+        var b = document.getElementById(ids[i]);
+        if (!b) continue;
+        b.textContent = bgmMuted ? '🔇 音乐' : '🎵 音乐';
+        b.classList.toggle('off', bgmMuted);
+    }
+}
+
+function toggleBgm() {
+    bgmMuted = !bgmMuted;
+    try { localStorage.setItem(BGM_MUTE_KEY, bgmMuted ? '1' : '0'); } catch(e) {}
+    if (bgmMuted) {
+        if (bgmAudio && !bgmAudio.paused) bgmAudio.pause();
+    } else {
+        playBGM();
+    }
+    updateBgmButtons();
+}
+
 function playBGM() {
+    if (bgmMuted) return;
     try {
         if (!bgmAudio) {
             var bgmName = BGM_LIST[Math.floor(Math.random() * BGM_LIST.length)] + '.mp3';
@@ -2970,6 +3013,7 @@ function solo_settle(g) {
 }
 
 function start_new_game_solo() {
+    soloGen++;
     _unkCache.key = null; _unkCache.byRank = null;
     selectedIds = {}; selectedCount = 0;
     handDrag.el = null; handDrag.pointerId = null; handDrag.active = false; handDrag.suppressClick = false;
@@ -3194,12 +3238,15 @@ function checkSoloGameEnd(lastPlayerName) {
     return false;
 }
 
+var soloGen = 0; // 中途退出时自增，作废排队中的电脑出牌定时器
 function checkSoloAITurn() {
     if (G.phase === 'ended' || G.phase === 'waiting_choice') return;
     var currSeat = G.turn;
     if (currSeat === 0) return;
     
+    var gen = soloGen;
     setTimeout(function() {
+        if (gen !== soloGen) return;
         if (G.phase !== 'play' || G.turn !== currSeat) return;
         if (llBadgeActive) return; // 等“地主”大字飞完再出牌
         
@@ -4161,6 +4208,7 @@ function renderAll() {
 
 document.addEventListener("DOMContentLoaded", () => {
     preloadAssets();
+    updateBgmButtons();
     var lastUser = null;
     try { lastUser = localStorage.getItem('lastUser'); } catch(e) {}
     if (lastUser) {
@@ -4171,6 +4219,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.getElementById('btn-play').onclick = humanPlay;
 document.getElementById('btn-pass').onclick = humanPass;
+document.getElementById('btn-music-lobby').onclick = toggleBgm;
+document.getElementById('btn-music-game').onclick = toggleBgm;
 document.getElementById('my-hand').addEventListener('click', function(e) {
     if (handDrag.suppressClick) return;   // 刚拖过牌，不当作点选
     if (G.phase === 'ended') return;
@@ -4232,13 +4282,48 @@ document.getElementById('confirm-dialog').addEventListener('click', function(e) 
     if (e.target === this) hideGameConfirm();
 });
 
+// 中途离开回到主菜单：不刷新页面，保留已加载好的牌面/音效资源
+function resetGameUIForMenu() {
+    if (llBadgeTimer) { clearTimeout(llBadgeTimer); llBadgeTimer = null; }
+    llBadgeActive = false;
+    var badge = $('landlord-badge');
+    if (badge) {
+        badge.classList.remove('show', 'flying');
+        badge.style.removeProperty('--fly-x');
+        badge.style.removeProperty('--fly-y');
+    }
+    document.body.classList.remove('ll-badge', 'settle-reveal');
+    $('gameover-dialog').classList.add('hidden');
+    $('landlord-dialog').classList.add('hidden');
+    $('screen-game').style.display = 'none';
+    $('screen-auth').style.display = 'none';
+    $('screen-lobby').style.display = 'none';
+    $('screen-menu').style.display = 'flex';
+}
+
+function leaveSoloToMenu() {
+    soloGen++;              // 排队中的电脑出牌直接作废
+    if (G) G.phase = 'ended';
+    selectedIds = {}; selectedCount = 0;
+    resetGameUIForMenu();
+}
+
+function leaveOnlineToMenu() {
+    if (syncTimer) { clearInterval(syncTimer); syncTimer = null; }
+    enteredGame = false;
+    window._rejoinHintShown = false;
+    lastGameStr = "";
+    $('history-panel').innerHTML = '';
+    resetGameUIForMenu();
+}
+
 document.getElementById('btn-quit').onclick = function(){ 
     playSound('click');
     if (isSoloMode) {
         showGameConfirm('退出单机模式',
             '当前对局不会保存。<br><span class="confirm-note">确定返回游戏大厅吗？</span>',
             '确定退出',
-            function(){ window.location.reload(); });
+            leaveSoloToMenu);
         return;
     }
     showGameConfirm('离开牌桌',
@@ -4249,9 +4334,7 @@ document.getElementById('btn-quit').onclick = function(){
             fetch(API_BASE + '/api/leave_game', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: u, session_id: mySessionId })
-            }).then(() => {
-                window.location.reload();
-            });
+            }).then(leaveOnlineToMenu, leaveOnlineToMenu);
         });
 };
 
