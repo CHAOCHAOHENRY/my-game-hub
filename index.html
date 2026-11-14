@@ -882,6 +882,23 @@ body.force-rotate #screen-game { z-index: 4000; }
 body.force-rotate .dialog-overlay { z-index: 5000; }
 /* 强制旋转时牌桌是 4000，ID 选择器的 1300 会把确认框压在牌桌下面（点退出像没反应） */
 body.force-rotate #confirm-dialog { z-index: 5000; }
+/* toast、地主大字在牌桌外，不跟着转就会横着显示；旋转后坐标宽高互换 */
+body.force-rotate #toast {
+    top: 50%;
+    left: 80%;
+    transform: translate(-50%, -50%) rotate(90deg);
+}
+body.force-rotate #landlord-badge {
+    top: 50%;
+    left: 60%;
+    transform: translate(-50%, -50%) rotate(90deg) scale(3);
+}
+body.force-rotate #landlord-badge.show {
+    transform: translate(-50%, -50%) rotate(90deg) scale(1);
+}
+body.force-rotate #landlord-badge.show.flying {
+    transform: translate(calc(-50% + var(--fly-x, 0px)), calc(-50% + var(--fly-y, 0px))) rotate(90deg) scale(.22);
+}
 body.force-rotate #table { top: 40px; bottom: var(--myzone-h); }
 body.force-rotate #my-hand { top: 5px; }
 body.force-rotate #my-hand img.sel { transform: translateY(-15px); box-shadow: 0 5px 15px rgba(0,0,0,0.6); }
