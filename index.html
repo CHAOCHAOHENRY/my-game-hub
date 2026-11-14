@@ -838,7 +838,8 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
         /* 常规叠 40%；屏幕太窄时自动加大叠压，保证 13 张不溢出 */
         --hand-overlap: min(calc(var(--hand-w) * -0.4), calc((100vw - 8px - 13 * var(--hand-w)) / 12));
         --opp-w: 35px;
-        --trick-w: 70px;
+        /* 出牌区跟手牌一样大 */
+        --trick-w: var(--hand-w);
         --myzone-h: calc(var(--hand-w) * 1.4 + 60px);
         --open-w: 38px; --open-cols: 6;
     }
@@ -859,7 +860,7 @@ body.force-rotate {
     --hand-w: clamp(78px, 11.5vh, 104px);
     --hand-overlap: min(calc(var(--hand-w) * -0.4), calc((100vh - 8px - 13 * var(--hand-w)) / 12));
     --opp-w: 35px;
-    --trick-w: 70px;
+    --trick-w: var(--hand-w);
     --myzone-h: calc(var(--hand-w) * 1.4 + 60px);
     --open-w: 38px; --open-cols: 6;
 }
@@ -3424,12 +3425,7 @@ function renderAllSingle(tempG) {
     var handSig = handSignature(sorted);
     if (handSig !== G._lastHandSig) {
         G._lastHandSig = handSig;
-        var hHtml = '';
-        for(var k=0; k<sorted.length; k++) {
-            var c = sorted[k];
-            hHtml += '<img src="'+img(c.id)+'" data-id="'+c.id+'" decoding="async" class="'+(selectedIds[c.id]?'sel':'')+'">';
-        }
-        $('my-hand').innerHTML = hHtml;
+        setHandImages(sorted);
     } else {
         // 手牌没变就只切换选中态，避免重建 DOM 导致手机端整手牌闪烁
         var imgs = $('my-hand').querySelectorAll('img');
@@ -3756,6 +3752,34 @@ function handSignature(cards) {
     return cards.map(function(c){ return c.id || c; }).join(',');
 }
 
+// 手牌增量更新：只删掉打出去的牌，已有 <img> 原地复用。
+// 整块 innerHTML 重建会让浏览器重新创建/解码图片，手机上表现为整手牌先消失再慢慢出现。
+function setHandImages(cards) {
+    var wrap = $('my-hand');
+    if (!wrap) return;
+    var want = cards.map(function(c){ return c.id || c; });
+    var existing = Array.prototype.slice.call(wrap.children);
+    var have = {};
+    existing.forEach(function(im){
+        var id = im.getAttribute('data-id');
+        if (id) have[id] = im;
+        if (want.indexOf(id) === -1) wrap.removeChild(im);
+    });
+    for (var i = 0; i < want.length; i++) {
+        var id = want[i];
+        var im = have[id];
+        if (!im) {
+            im = document.createElement('img');
+            im.src = img(id);
+            im.setAttribute('data-id', id);
+            im.decoding = 'async';
+        }
+        im.classList.toggle('sel', !!selectedIds[id]);
+        var ref = wrap.children[i] || null;
+        if (ref !== im) wrap.insertBefore(im, ref);
+    }
+}
+
 // ===== 手动摆牌（只改前端显示顺序，不影响出牌判定/服务器） =====
 var handOrderIds = [];   // 玩家自己拖出来的从左到右顺序
 
@@ -3879,6 +3903,7 @@ function setSeatBox(box, plateHtml, plateSig, isTurn, backCount, faceCards) {
         ? 'f:' + face.map(function(c){ return c.id; }).join(',')
         : 'b:' + Math.min(backCount || 0, 9);
     if (handSig !== box._handSig) {
+        var prevSig = box._handSig;
         box._handSig = handSig;
         if (face || (backCount || 0) > 0) {
             if (!hand) {
@@ -3886,8 +3911,8 @@ function setSeatBox(box, plateHtml, plateSig, isTurn, backCount, faceCards) {
                 hand = box.querySelector('.opp-hand');
             }
             hand.className = 'opp-hand' + (face ? ' open' : '');
-            hand.innerHTML = '';
             if (face) {
+                hand.innerHTML = '';
                 // 左右两家空间窄：按张数平均分列（最多 5 列），避免最后一行只剩一张孤零零的牌
                 if (box.id === 'seat-1' || box.id === 'seat-3') {
                     var n = face.length;
@@ -3903,11 +3928,16 @@ function setSeatBox(box, plateHtml, plateSig, isTurn, backCount, faceCards) {
                     hand.appendChild(im);
                 });
             } else {
+                // 正常出牌只增删牌背数量，不重建整排（重建会让手机端整排牌背闪一下）
+                if (prevSig && prevSig.indexOf('f:') === 0) hand.innerHTML = '';
                 var want = Math.min(backCount, 9);
-                for (var j = 0; j < want; j++) {
+                var cur = hand.children.length;
+                while (cur > want) { hand.removeChild(hand.lastElementChild); cur--; }
+                while (cur < want) {
                     var im = document.createElement('img');
                     im.src = 'cards/back1.png';
                     hand.appendChild(im);
+                    cur++;
                 }
             }
         } else if (hand) {
@@ -3930,6 +3960,16 @@ function setTrickCards(el, cards) {
 
     var wrap = document.createElement('div');
     wrap.className = 'trick-cards';
+    // 出牌区默认跟手牌一样大，张数多（长顺子）时按屏幕宽度收窄，避免撑出屏幕
+    var n = cards.length;
+    var handImg = document.querySelector('#my-hand img');
+    // offsetWidth 不受旋转 transform 影响，强制横屏下也能拿到真实牌宽
+    var baseW = handImg ? handImg.offsetWidth : 0;
+    if (n > 1 && baseW > 0) {
+        var tableW = (document.body.classList.contains('force-rotate') ? window.innerHeight : window.innerWidth) - 16;
+        var fitW = Math.floor(tableW / (0.3 + 0.7 * n));
+        if (fitW < baseW) wrap.style.setProperty('--trick-w', Math.max(40, fitW) + 'px');
+    }
     var pending = [];
     cards.forEach(function(c){
         var src = img(c.id);
@@ -4028,12 +4068,7 @@ function renderAll() {
     var handSig = handSignature(sorted);
     if (handSig !== G._lastHandSig) {
         G._lastHandSig = handSig;
-        var hHtml = '';
-        for(var k=0; k<sorted.length; k++) {
-            var c = sorted[k];
-            hHtml += '<img src="'+img(c.id)+'" data-id="'+c.id+'" decoding="async" class="'+(selectedIds[c.id]?'sel':'')+'">';
-        }
-        $('my-hand').innerHTML = hHtml;
+        setHandImages(sorted);
     } else {
         // 手牌没变就只切换选中态，避免重建 DOM 导致手机端整手牌闪烁
         var imgs = $('my-hand').querySelectorAll('img');
