@@ -833,12 +833,13 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
 
 @media (max-width: 900px) and (orientation: landscape) {
     :root {
-        /* 横屏手机屏幕矮，但宽度富余：把自己手牌放大一档，久看不累 */
-        --hand-w: clamp(76px, 10.5vw, 88px);
-        --hand-overlap: calc(var(--hand-w) * -0.5);
+        /* 横屏手机屏幕矮，但宽度富余：手牌尽量铺满一排，少叠一点、单张更大 */
+        --hand-w: clamp(78px, 11.5vw, 104px);
+        /* 常规叠 40%；屏幕太窄时自动加大叠压，保证 13 张不溢出 */
+        --hand-overlap: min(calc(var(--hand-w) * -0.4), calc((100vw - 8px - 13 * var(--hand-w)) / 12));
         --opp-w: 35px;
         --trick-w: 70px;
-        --myzone-h: clamp(158px, 45vh, 182px);
+        --myzone-h: calc(var(--hand-w) * 1.4 + 60px);
         --open-w: 38px; --open-cols: 6;
     }
     #table { top: 40px; bottom: var(--myzone-h); }
@@ -854,12 +855,12 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
 
 /* ================= 🔥 竖屏强制横屏模式（系统锁定竖屏时使用） ================= */
 body.force-rotate {
-    /* 旋转后宽高互换：手牌尺寸看 vh，牌区高度看 vw */
-    --hand-w: clamp(76px, 10vh, 88px);
-    --hand-overlap: calc(var(--hand-w) * -0.5);
+    /* 旋转后宽高互换：手牌尺寸看 vh，牌区高度跟着牌高走 */
+    --hand-w: clamp(78px, 11.5vh, 104px);
+    --hand-overlap: min(calc(var(--hand-w) * -0.4), calc((100vh - 8px - 13 * var(--hand-w)) / 12));
     --opp-w: 35px;
     --trick-w: 70px;
-    --myzone-h: clamp(158px, 45vw, 182px);
+    --myzone-h: calc(var(--hand-w) * 1.4 + 60px);
     --open-w: 38px; --open-cols: 6;
 }
 body.force-rotate #seat-2 .opp-hand.open img { width: var(--open-w); height: calc(var(--open-w) * 1.4); }
