@@ -846,12 +846,25 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
     #table { top: 40px; bottom: var(--myzone-h); }
     #my-hand { top: 5px; }
     #my-hand img.sel { transform: translateY(-15px); box-shadow: 0 5px 15px rgba(0,0,0,0.6); }
-    #history-panel { width: 140px; max-height: calc(50% - 44px); right: 2px; bottom: 6px; }
-    #seat-1 { right: 5px; top: 50%; }
+    /* 记牌条贴着右下角并伸到屏幕底边，尽量多显几条 */
+    #history-panel { width: 152px; max-height: calc(94% + 4px); right: 2px; bottom: calc(6px - var(--myzone-h)); padding: 4px; gap: 2px; z-index: 28; }
+    #history-panel .hist-item { padding: 1px 3px; gap: 3px; grid-template-columns: minmax(0, 34px) 1fr; }
+    #history-panel .hist-name { font-size: 10px; }
+    #history-panel .card-text { font-size: 9px; padding: 0 1px; line-height: 12px; }
+    #history-panel .pass-text { font-size: 9px; }
+    /* 右侧这家上移，把右下角让给记牌条 */
+    #seat-1 { right: 5px; top: 6%; }
     #seat-3 { left: 5px; top: 50%; }
     #seat-2 .opp-hand.open img { width: var(--open-w); height: calc(var(--open-w) * 1.4); }
     .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
     #btn-orient { display: none; }
+    /* 叫地主弹窗：按钮排一行压扁高度，不再压住手牌 */
+    #landlord-dialog { padding-top: 3vh; }
+    #landlord-dialog .dialog-box { padding: 10px 14px; min-width: 0; }
+    #landlord-dialog h2 { font-size: 17px; margin-bottom: 5px; }
+    #landlord-dialog p { font-size: 12px; margin-bottom: 8px; line-height: 1.35; }
+    #landlord-dialog .landlord-actions { display: flex; gap: 8px; }
+    #landlord-dialog .landlord-actions button { flex: 1 1 0; width: auto; margin-bottom: 0; padding: 7px 6px; font-size: 12px; }
 }
 
 /* ================= 🔥 竖屏强制横屏模式（系统锁定竖屏时使用） ================= */
@@ -902,10 +915,23 @@ body.force-rotate #landlord-badge.show.flying {
 body.force-rotate #table { top: 40px; bottom: var(--myzone-h); }
 body.force-rotate #my-hand { top: 5px; }
 body.force-rotate #my-hand img.sel { transform: translateY(-15px); box-shadow: 0 5px 15px rgba(0,0,0,0.6); }
-body.force-rotate #history-panel { width: 140px; max-height: calc(50% - 44px); right: 2px; bottom: 6px; }
-body.force-rotate #seat-1 { right: 5px; top: 50%; }
+/* 记牌条贴着右下角并伸到屏幕底边，尽量多显几条 */
+body.force-rotate #history-panel { width: 152px; max-height: calc(94% + 4px); right: 2px; bottom: calc(6px - var(--myzone-h)); padding: 4px; gap: 2px; z-index: 28; }
+body.force-rotate #history-panel .hist-item { padding: 1px 3px; gap: 3px; grid-template-columns: minmax(0, 34px) 1fr; }
+body.force-rotate #history-panel .hist-name { font-size: 10px; }
+body.force-rotate #history-panel .card-text { font-size: 9px; padding: 0 1px; line-height: 12px; }
+body.force-rotate #history-panel .pass-text { font-size: 9px; }
+/* 右侧这家上移，把右下角让给记牌条 */
+body.force-rotate #seat-1 { right: 5px; top: 6%; }
 body.force-rotate #seat-3 { left: 5px; top: 50%; }
 body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
+/* 叫地主弹窗：按钮排一行压扁高度，不再压住手牌 */
+body.force-rotate #landlord-dialog { padding-top: 44px; }
+body.force-rotate #landlord-dialog .dialog-box { padding: 10px 14px; min-width: 0; }
+body.force-rotate #landlord-dialog h2 { font-size: 17px; margin-bottom: 5px; }
+body.force-rotate #landlord-dialog p { font-size: 12px; margin-bottom: 8px; line-height: 1.35; }
+body.force-rotate #landlord-dialog .landlord-actions { display: flex; gap: 8px; }
+body.force-rotate #landlord-dialog .landlord-actions button { flex: 1 1 0; width: auto; margin-bottom: 0; padding: 7px 6px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -1133,9 +1159,11 @@ body.force-rotate .trick-cards { min-height: calc(var(--trick-w) * 1.4); }
     <div class="dialog-box">
         <h2>双牌警示</h2>
         <p>你握有【方块3】和【方块A】双牌！<br>请选择你的策略：</p>
-        <button class="btn-call" onclick="choiceLandlord('call')">叫地主 (赢第一+12，否则-12)</button>
-        <button class="btn-hide" onclick="choiceLandlord('hide')">不表示 (正常计分，赢第一+6)</button>
-        <button class="btn-fold" onclick="choiceLandlord('fold')">弃牌认输 (-3分)</button>
+        <div class="landlord-actions">
+            <button class="btn-call" onclick="choiceLandlord('call')">叫地主 (赢第一+12，否则-12)</button>
+            <button class="btn-hide" onclick="choiceLandlord('hide')">不表示 (正常计分，赢第一+6)</button>
+            <button class="btn-fold" onclick="choiceLandlord('fold')">弃牌认输 (-3分)</button>
+        </div>
     </div>
 </div>
 
@@ -3930,12 +3958,35 @@ function setSeatBox(box, plateHtml, plateSig, isTurn, backCount, faceCards) {
             hand.className = 'opp-hand' + (face ? ' open' : '');
             if (face) {
                 hand.innerHTML = '';
-                // 左右两家空间窄：按张数平均分列（最多 5 列），避免最后一行只剩一张孤零零的牌
+                var n = face.length;
+                // 横屏牌桌矮：按实际可用空间算亮牌尺寸，在放得下的前提下尽量放大
+                var wide = document.body.classList.contains('force-rotate') ||
+                    window.matchMedia('(max-width: 900px) and (orientation: landscape)').matches;
+                var perRow = wide ? 7 : 5;
+                var cols = Math.min(perRow, Math.max(1, Math.ceil(n / Math.ceil(n / perRow))));
+                // 左右两家空间窄：按张数平均分列，避免最后一行只剩一张孤零零的牌
                 if (box.id === 'seat-1' || box.id === 'seat-3') {
-                    var n = face.length;
-                    hand.style.setProperty('--open-cols', Math.min(5, Math.ceil(n / Math.ceil(n / 5))));
+                    hand.style.setProperty('--open-cols', cols);
                 } else {
                     hand.style.removeProperty('--open-cols');
+                }
+                if (wide) {
+                    var tableEl = $('table');
+                    var cardW;
+                    if (box.id === 'seat-1' || box.id === 'seat-3') {
+                        var availH = Math.max(60, (tableEl ? tableEl.clientHeight : 200) - 40);
+                        cardW = (availH / Math.ceil(n / cols) - 5) / 1.4;
+                        cardW = Math.max(30, Math.min(84, Math.round(cardW)));
+                        hand.style.maxWidth = (cols * cardW + (cols - 1) * 4 + 2) + 'px';
+                    } else {
+                        var availW = Math.max(120, (tableEl ? tableEl.clientWidth : 700) - 24);
+                        cardW = Math.max(30, Math.min(84, Math.round(availW / n - 5)));
+                        hand.style.maxWidth = availW + 'px';
+                    }
+                    hand.style.setProperty('--open-w', cardW + 'px');
+                } else {
+                    hand.style.removeProperty('--open-w');
+                    hand.style.removeProperty('max-width');
                 }
                 face.slice().sort(function(a,b){ return strength(b.id) - strength(a.id); }).forEach(function(c){
                     var im = document.createElement('img');
