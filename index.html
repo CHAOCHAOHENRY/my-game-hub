@@ -3541,6 +3541,11 @@ function renderAllSingle(tempG) {
 }
 
 // ================= 🔥 联机模式原有逻辑 =================
+// 本地先出牌、网络后台确认：这几个变量用来丢弃旧同步结果、避免重复音效
+var syncGen = 0;          // 乐观出牌后自增，作废此前发出的同步响应
+var pendingPlayAt = 0;    // 出牌请求在途时间，期间跳过轮询同步，防止旧状态把刚出的牌“变回来”
+var pendingPlaySig = null;   // 已本地播过音效的那手牌
+
 function startSync() {
     if (syncTimer) clearInterval(syncTimer);
     syncTimer = setInterval(doSync, 1200); 
@@ -3548,8 +3553,11 @@ function startSync() {
 
 function doSync() {
     if (isSoloMode) return; // 🔥 单机模式不向服务器发请求
+    // 出牌请求还在路上时先别同步，否则会拿到出牌前的旧状态
+    if (pendingPlayAt && Date.now() - pendingPlayAt < 6000) return;
     var myName = $('lobby-user-name').textContent;
     if (myName === '未登录') return;
+    var gen = syncGen;
     
     fetch(API_BASE + '/api/sync', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3563,6 +3571,7 @@ function doSync() {
         }
         return res.json();
     }).then(data => {
+        if (gen !== syncGen) return; // 期间本地已乐观出牌，这份旧状态作废
         if (!data.ok) return;
         if (data.redeemed) {
             myRedeemed = {};
@@ -3680,8 +3689,17 @@ function doSync() {
                 var newHistLen = data.game.history ? data.game.history.length : 0;
                 if (newHistLen > oldHistLen) {
                     var lastAction = data.game.history[newHistLen - 1];
-                    if (lastAction.type === 'play') playCardVoice(analyze(lastAction.cards), lastAction.cards);
-                    else if (lastAction.type === 'pass') playSound('pass');
+                    if (lastAction.type === 'play') {
+                        // 自己刚乐观出的牌已经在按下的瞬间播过音效，这里不再重复
+                        var selfPlay = pendingPlaySig &&
+                            lastAction.seat === data.game.my_seat &&
+                            lastAction.cards.slice().sort().join(',') === pendingPlaySig;
+                        pendingPlaySig = null;
+                        if (!selfPlay) playCardVoice(analyze(lastAction.cards), lastAction.cards);
+                    } else {
+                        pendingPlaySig = null;
+                        if (lastAction.type === 'pass') playSound('pass');
+                    }
                 }
 
                 if (data.game.phase === 'ended' && (!lastGameStr || JSON.parse(lastGameStr).phase !== 'ended')) {
@@ -3729,6 +3747,7 @@ function updateGameState(game, myName) {
     G.phase = game.phase; 
     G.landlord = game.landlord;
     G.landlord_public = game.landlord_public;
+    G.history = game.history ? game.history.slice() : [];
     mySeat = game.my_seat;
 
     // 换局重新发牌时清掉上一局残留的选中牌，否则新手里出现同一张牌会一直显示为选中
@@ -3808,17 +3827,66 @@ function restartGame() {
     });
 }
 
+function nextSeatWithCards(from) {
+    for (var k = 1; k <= 4; k++) {
+        var s = (from + k) % 4;
+        if (G.hands[s] && G.hands[s].length > 0) return s;
+    }
+    return (from + 1) % 4;
+}
+
+// 按下“出牌”就先把牌打出去（手牌、出牌区、历史、轮次一起更新），请求在后台确认
+function optimisticOwnPlay(cards, p) {
+    var hand = G.hands[mySeat] || [];
+    cards.forEach(function(id){
+        for (var i = 0; i < hand.length; i++) {
+            if ((hand[i] && hand[i].id) === id) { hand.splice(i, 1); break; }
+        }
+    });
+    G.currentPlay = { seat: mySeat, cards: cards.map(function(id){ return mk(id[0], id.slice(1)); }), play: p };
+    if (!G.history) G.history = [];
+    G.history.push({ type: 'play', seat: mySeat, cards: cards.slice() });
+    G.turn = nextSeatWithCards(mySeat);
+
+    var cHtml = '';
+    cards.forEach(function(cid){ cHtml += '<span class="card-text">' + cardName(cid) + '</span>'; });
+    $('history-panel').insertAdjacentHTML('afterbegin',
+        '<div class="hist-item"><div class="hist-name">' + dispName(G.players[mySeat]) + '</div><div class="hist-cards">' + cHtml + '</div></div>');
+
+    playCardVoice(p, cards);
+    selectedIds = {}; selectedCount = 0;
+    syncGen++;
+    renderAll();
+}
+
 function humanPlay() {
     if (isSoloMode) return soloHumanPlay();
     
     if (G.turn !== mySeat || G.phase === 'ended' || !G.hands[mySeat] || G.hands[mySeat].length === 0) return;
     var cards = Object.keys(selectedIds).map(function(id){ return id; });
     if(!cards.length) return;
+
+    // 和服务端同样的规则先在本地校验，合法就立刻出牌，不等网络
+    if ((G.history ? G.history.length : 0) === 0 &&
+        G.hands[mySeat].some(function(c){ return c.id === 'c4'; }) &&
+        cards.indexOf('c4') === -1) {
+        showToast("首出必须包含梅花4（♣4）");
+        return;
+    }
+    var p = analyze(cards);
+    if (!p) { showToast("牌型不合法"); return; }
+    var base = G.currentPlay ? G.currentPlay.play : null;
+    if (base && !can_beat(p, base)) { showToast("打不过上家"); return; }
+
+    pendingPlaySig = cards.slice().sort().join(',');
+    pendingPlayAt = Date.now();
+    optimisticOwnPlay(cards, p);
     
     fetch(API_BASE + '/api/play', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table: currentTableId, seat: mySeat, cards: cards, username: document.getElementById('lobby-user-name').textContent, session_id: mySessionId })
     }).then(res => res.json()).then(data => {
+        pendingPlayAt = 0;
         if(data.error) {
             if (data.error === 'kicked') {
                 clearInterval(syncTimer);
@@ -3826,13 +3894,21 @@ function humanPlay() {
                 window.location.reload();
                 return;
             }
-            showToast(data.error); 
-            selectedIds = {}; selectedCount = 0; 
-            renderAll();
+            showToast(data.error);
+            // 服务端拒绝（多为状态过期）：用服务器状态把手牌/出牌区还原
+            pendingPlaySig = null;
+            selectedIds = {}; selectedCount = 0;
+            lastGameStr = "";
+            doSync();
         } else {
             selectedIds = {}; selectedCount = 0;
-            lastGameStr = ""; 
+            lastGameStr = "";
+            doSync();
         }
+    }).catch(function(){
+        pendingPlayAt = 0;
+        pendingPlaySig = null;
+        lastGameStr = "";   // 让下一次同步强制全量刷新，纠正本地状态
     });
 }
 
@@ -3843,7 +3919,7 @@ function humanPass() {
     fetch(API_BASE + '/api/pass', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table: currentTableId, seat: mySeat, username: document.getElementById('lobby-user-name').textContent, session_id: mySessionId })
-    }).then(() => { selectedIds = {}; selectedCount = 0; lastGameStr = ""; });
+    }).then(() => { selectedIds = {}; selectedCount = 0; lastGameStr = ""; doSync(); });
 }
 
 function handSignature(cards) {
