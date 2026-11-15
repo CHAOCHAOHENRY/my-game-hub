@@ -3541,10 +3541,11 @@ function renderAllSingle(tempG) {
 }
 
 // ================= 🔥 联机模式原有逻辑 =================
-// 本地先出牌、网络后台确认：这几个变量用来丢弃旧同步结果、避免重复音效
-var syncGen = 0;          // 乐观出牌后自增，作废此前发出的同步响应
-var pendingPlayAt = 0;    // 出牌请求在途时间，期间跳过轮询同步，防止旧状态把刚出的牌“变回来”
+// 本地先出牌/过牌、网络后台确认：这几个变量用来丢弃旧同步结果、避免重复音效
+var syncGen = 0;          // 乐观出牌/过牌后自增，作废此前发出的同步响应
+var pendingActionAt = 0;  // 出牌/过牌请求在途时间，期间跳过轮询同步，防止旧状态把刚出的牌“变回来”
 var pendingPlaySig = null;   // 已本地播过音效的那手牌
+var pendingPassSeat = null;  // 已本地播过音效的那次过牌
 
 function startSync() {
     if (syncTimer) clearInterval(syncTimer);
@@ -3553,8 +3554,8 @@ function startSync() {
 
 function doSync() {
     if (isSoloMode) return; // 🔥 单机模式不向服务器发请求
-    // 出牌请求还在路上时先别同步，否则会拿到出牌前的旧状态
-    if (pendingPlayAt && Date.now() - pendingPlayAt < 6000) return;
+    // 出牌/过牌请求还在路上时先别同步，否则会拿到操作前的旧状态
+    if (pendingActionAt && Date.now() - pendingActionAt < 6000) return;
     var myName = $('lobby-user-name').textContent;
     if (myName === '未登录') return;
     var gen = syncGen;
@@ -3695,10 +3696,16 @@ function doSync() {
                             lastAction.seat === data.game.my_seat &&
                             lastAction.cards.slice().sort().join(',') === pendingPlaySig;
                         pendingPlaySig = null;
+                        pendingPassSeat = null;
                         if (!selfPlay) playCardVoice(analyze(lastAction.cards), lastAction.cards);
                     } else {
                         pendingPlaySig = null;
-                        if (lastAction.type === 'pass') playSound('pass');
+                        if (lastAction.type === 'pass') {
+                            // 自己的过牌已经本地播过音效，这里不再重复
+                            var selfPass = pendingPassSeat !== null && lastAction.seat === pendingPassSeat;
+                            pendingPassSeat = null;
+                            if (!selfPass) playSound('pass');
+                        }
                     }
                 }
 
@@ -3879,14 +3886,14 @@ function humanPlay() {
     if (base && !can_beat(p, base)) { showToast("打不过上家"); return; }
 
     pendingPlaySig = cards.slice().sort().join(',');
-    pendingPlayAt = Date.now();
+    pendingActionAt = Date.now();
     optimisticOwnPlay(cards, p);
     
     fetch(API_BASE + '/api/play', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table: currentTableId, seat: mySeat, cards: cards, username: document.getElementById('lobby-user-name').textContent, session_id: mySessionId })
     }).then(res => res.json()).then(data => {
-        pendingPlayAt = 0;
+        pendingActionAt = 0;
         if(data.error) {
             if (data.error === 'kicked') {
                 clearInterval(syncTimer);
@@ -3906,20 +3913,73 @@ function humanPlay() {
             doSync();
         }
     }).catch(function(){
-        pendingPlayAt = 0;
+        pendingActionAt = 0;
         pendingPlaySig = null;
         lastGameStr = "";   // 让下一次同步强制全量刷新，纠正本地状态
     });
+}
+
+// 按下“过牌”先把这次过牌记上（历史、轮次、轮末清桌面），请求在后台确认
+function optimisticOwnPass() {
+    if (!G.history) G.history = [];
+    G.history.push({ type: 'pass', seat: mySeat });
+    $('history-panel').insertAdjacentHTML('afterbegin',
+        '<div class="hist-item"><div class="hist-name">' + dispName(G.players[mySeat]) + '</div><div class="hist-cards"><span class="pass-text">不出 (过牌)</span></div></div>');
+    playSound('pass');
+
+    G.turn = nextSeatWithCards(mySeat);
+
+    // 和服务器一致：本轮所有人都过牌后清桌面，由最后出牌的人重新领出
+    var passCount = 0;
+    for (var h = G.history.length - 1; h >= 0 && G.history[h].type === 'pass'; h--) passCount++;
+    var alive = 0;
+    for (var s = 0; s < 4; s++) { if (G.hands[s] && G.hands[s].length > 0) alive++; }
+    if (G.currentPlay && passCount >= alive - 1) {
+        var leader = G.currentPlay.seat;
+        G.currentPlay = null;
+        G.turn = (G.hands[leader] && G.hands[leader].length > 0) ? leader : nextSeatWithCards(leader);
+    }
+
+    selectedIds = {}; selectedCount = 0;
+    syncGen++;
+    renderAll();
 }
 
 function humanPass() {
     if (isSoloMode) return soloHumanPass();
     
     if (G.turn !== mySeat || G.phase === 'ended' || !G.hands[mySeat] || G.hands[mySeat].length === 0) return;
+    if (!G.currentPlay) { showToast("你必须出牌"); return; }
+
+    pendingPassSeat = mySeat;
+    pendingActionAt = Date.now();
+    optimisticOwnPass();
+
     fetch(API_BASE + '/api/pass', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table: currentTableId, seat: mySeat, username: document.getElementById('lobby-user-name').textContent, session_id: mySessionId })
-    }).then(() => { selectedIds = {}; selectedCount = 0; lastGameStr = ""; doSync(); });
+    }).then(res => res.json()).then(data => {
+        pendingActionAt = 0;
+        if (data.error) {
+            if (data.error === 'kicked') {
+                clearInterval(syncTimer);
+                alert("您的账号已在其他地方登录，本页面已被强制下线！");
+                window.location.reload();
+                return;
+            }
+            showToast(data.error);
+            pendingPassSeat = null;   // 服务端拒绝：用服务器状态还原
+            lastGameStr = "";
+            doSync();
+        } else {
+            lastGameStr = "";
+            doSync();
+        }
+    }).catch(function(){
+        pendingActionAt = 0;
+        pendingPassSeat = null;
+        lastGameStr = "";
+    });
 }
 
 function handSignature(cards) {
