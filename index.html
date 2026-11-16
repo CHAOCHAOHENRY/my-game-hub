@@ -292,6 +292,16 @@ input, button { outline:none; }
 }
 #btn-music-lobby.off { background: linear-gradient(#5c5c5c,#383838); color:#e2e2e2; border-color: rgba(240,208,138,.45); }
 
+/* 主菜单右上角的横竖屏切换（手机系统锁定竖屏时用） */
+#btn-orient-menu {
+    display: none; position: fixed; top: 20px; right: 20px; z-index: 9999;
+    background: linear-gradient(#2f6fa8,#1b4a75); color:#fff;
+    border: 2px solid #f0d08a; border-radius: 20px; padding: 8px 14px;
+    font-weight: bold; font-size: 13px; white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.25);
+    cursor: pointer;
+}
+
 .table-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 150px 100px; width: min(900px, 96vw); justify-items:center; margin-bottom: 70px; margin-top: 92px; }
 .single-table {
     --seat: 82px; --seat-off: -46px;
@@ -723,13 +733,13 @@ body.settle-reveal #seat-3 .opp-hand.open img {
 
 /* 奖品池专属弹窗样式 */
 #prize-pool-modal .dialog-box { max-height: 80vh; display: flex; flex-direction: column; width: 500px; max-width: 90vw; margin-top: 0;}
-#prize-list { flex: 1; overflow-y: auto; padding-right: 5px; margin-bottom: 15px; text-align: left; }
+#prize-list { flex: 1; overflow-y: auto; padding-right: 5px; margin-bottom: 15px; text-align: left; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .prize-item { background: rgba(0,0,0,0.3); border: 1px solid #4a7a5f; border-radius: 8px; padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
 .prize-item.locked { opacity: 0.6; }
 .prize-item.owned { border-color: #ffd75e; box-shadow: 0 0 8px rgba(255,215,94,0.35); }
 .prize-item .p-title { font-weight: bold; color: #fff; }
 .prize-item .p-req { color: #ffd75e; font-size: 14px; }
-.prize-item .p-btn { background: #8ef09a; color: #0b4d1e; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+.prize-item .p-btn { flex: 0 0 auto; width: auto; margin-bottom: 0; background: #8ef09a; color: #0b4d1e; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
 .prize-item .p-btn:disabled { background: #555; color: #999; cursor: not-allowed; }
 
 #landlord-badge { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(3); font-size: 120px; font-weight: 900; color: #ffe98a; text-shadow: 0 0 30px #ff0000, 4px 4px 0 #b80018; opacity: 0; transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000; pointer-events: none; letter-spacing: 10px;}
@@ -796,6 +806,7 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
     #btn-prize-pool { position: fixed; top: 15px; right: 10px; padding: 6px 12px; font-size: 12px; z-index: 9999; }
     #btn-lobby-back { position: fixed; top: 15px; left: 10px; padding: 6px 12px; font-size: 12px; z-index: 9999; }
     #btn-music-lobby { top: 15px; right: 10px; padding: 6px 12px; font-size: 12px; }
+    #btn-orient-menu { display: inline-block; top: 15px; right: 10px; padding: 6px 12px; font-size: 12px; }
     #btn-music-game { margin-left: 5px; padding: 3px 8px; font-size: 11px; }
 
     .rules-wrap { padding: 15px; border-width: 2px; }
@@ -881,6 +892,8 @@ body.ll-badge .seat .nameplate .landlord-tag { opacity: 0; }
     #landlord-dialog p { font-size: 12px; margin-bottom: 8px; line-height: 1.35; }
     #landlord-dialog .landlord-actions { display: flex; gap: 8px; }
     #landlord-dialog .landlord-actions button { flex: 1 1 0; width: auto; margin-bottom: 0; padding: 7px 6px; font-size: 12px; }
+    /* 横屏手机屏幕矮：奖品池用满高度，列表滚动 */
+    #prize-pool-modal .dialog-box { max-height: 94vh; width: min(560px, 92vw); }
 }
 
 /* ================= 🔥 竖屏强制横屏模式（系统锁定竖屏时使用） ================= */
@@ -932,6 +945,36 @@ body.force-rotate #table { top: 40px; bottom: var(--myzone-h); }
 body.force-rotate #my-hand { top: 5px; }
 /* 竖屏按钮别压住右上那家，挪到左下角空档 */
 body.force-rotate #btn-orient { top: auto; bottom: 6px; left: 6px; right: auto; }
+/* 主菜单也跟着转，在厅里就能直接切横屏 */
+body.force-rotate #screen-menu {
+    position: fixed;
+    inset: auto;
+    top: 0;
+    left: 0;
+    width: 100vh;
+    height: 100vw;
+    width: 100dvh;
+    height: 100dvw;
+    transform: rotate(90deg) translateY(-100%);
+    transform-origin: top left;
+    z-index: 3000;
+}
+/* 保持右上角：旋转后 top/right 正好落在屏幕右上 */
+/* 旋转后可用高度只有屏幕宽，菜单收紧凑一点免得要滚 */
+body.force-rotate .menu-box { padding: 26px 22px 24px; }
+body.force-rotate .menu-title { font-size: 24px; margin-bottom: 12px; letter-spacing: 3px; }
+body.force-rotate .menu-title::after { display: none; }
+body.force-rotate .menu-box::after { display: none; }
+body.force-rotate .menu-btn { padding: 10px 14px 9px; font-size: 15px; margin-bottom: 9px; letter-spacing: 2px; }
+/* 横屏下奖品池按旋转后的短边限高：列表内部滚动，关闭按钮始终可见 */
+body.force-rotate #prize-pool-modal { padding: 10px; box-sizing: border-box; }
+body.force-rotate #prize-pool-modal .dialog-box {
+    max-height: calc(100dvw - 20px);
+    width: min(560px, 92dvh);
+    max-width: none;
+}
+body.force-rotate #prize-pool-modal .dialog-box > h2,
+body.force-rotate #prize-pool-modal .dialog-box > button { flex: 0 0 auto; }
 body.force-rotate #my-hand img.sel { transform: translateY(-15px); box-shadow: 0 5px 15px rgba(0,0,0,0.6); }
 /* 记牌条放在正右边的空档，止于手牌上方，不压牌 */
 body.force-rotate #history-panel { width: 168px; max-height: calc(100% - 96px); right: 2px; bottom: 4px; padding: 4px; gap: 2px; z-index: 28; }
@@ -975,6 +1018,7 @@ body.force-rotate #landlord-dialog .landlord-actions button { flex: 1 1 0; width
     <div class="title-skip">点击跳过 ›</div>
 </div>
 <div id="screen-menu">
+    <button id="btn-orient-menu">横屏</button>
     <div class="menu-box">
         <div class="menu-title">游 戏 大 厅</div>
         <button id="btn-menu-solo" class="menu-btn btn-solo">单机模式</button>
@@ -4376,6 +4420,8 @@ function setForceRotate(on) {
     else document.body.classList.remove('force-rotate');
     var b = document.getElementById('btn-orient');
     if (b) b.textContent = on ? '竖屏' : '横屏';
+    var m = document.getElementById('btn-orient-menu');
+    if (m) m.textContent = on ? '竖屏' : '横屏';
 }
 
 // 系统本身已经横屏时自动退出强制旋转，避免转两次
@@ -4387,6 +4433,10 @@ if (_orientMQ.addEventListener) _orientMQ.addEventListener('change', _onOrientCh
 else if (_orientMQ.addListener) _orientMQ.addListener(_onOrientChange);
 
 document.getElementById('btn-orient').onclick = function(){
+    playSound('click');
+    setForceRotate(!document.body.classList.contains('force-rotate'));
+};
+document.getElementById('btn-orient-menu').onclick = function(){
     playSound('click');
     setForceRotate(!document.body.classList.contains('force-rotate'));
 };
