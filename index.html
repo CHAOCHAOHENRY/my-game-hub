@@ -997,7 +997,10 @@ body.force-rotate .table-grid {
     margin-top: 64px;
     margin-bottom: 30px;
 }
-body.force-rotate .single-table { width: min(230px, 100%); height: 118px; --seat: 56px; --seat-off: -28px; }
+/* 牌桌宽度跟着旋转后的可用宽度走：桌子+两侧座位（各半个座位）= 一列的固定占用，保证相邻两桌的座位永不重叠 */
+body.force-rotate .single-table { width: min(230px, calc((100dvh - 252px)/3)); height: 118px; --seat: 56px; --seat-off: -28px; }
+/* 开始游戏原本是定在屏幕正中，旋转后会压住中间的牌桌；挪到左上角落、返回按钮正下方（pulse 动画带 translate 会顶掉定位，横屏下关掉） */
+body.force-rotate #btn-start-game { top: 58px; left: 12px; transform: none; animation: none; padding: 8px 18px; font-size: 15px; }
 body.force-rotate .table-title { font-size: 12px; padding: 2px 10px 3px; }
 body.force-rotate .seat-btn .s-name { max-width: 46px; font-size: 9px; }
 body.force-rotate .seat-btn .s-score { font-size: 9px; }
