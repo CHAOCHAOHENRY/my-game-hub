@@ -2250,6 +2250,12 @@ function get_team_solo(g, name, viewer) {
         return g.team_a.indexOf(idx) !== -1 ? "A" : "B";
     }
 
+    // 1v3 未公开，但地主打出过 ♦3 / ♦A → 公开信息已足够认出（不是偷看手牌）
+    var known = inferLandlordSolo(g);
+    if (known !== null) {
+        return idx === known ? "L" : "F";
+    }
+
     // 1v3 已公开
     if (g.landlord_public) {
         return idx === g.landlord ? "L" : "F";
@@ -2261,6 +2267,37 @@ function get_team_solo(g, name, viewer) {
     if (vi === g.landlord) return idx === g.landlord ? "L" : "F";      // 地主视角
     if (idx === vi) return "F";                                        // 农民看自己
     return "U";                                                        // 农民看别人：认不出地主
+}
+
+// 1v3 隐藏局：地主必然同时持有 ♦3 和 ♦A，谁先打出其中任意一张谁就是地主。
+function inferLandlordSolo(g) {
+    if (g.team_mode !== "1v3") return null;
+    if (g.landlord_public) return g.landlord;
+    var h = g.history || [];
+    var memo = g._llInfer;
+    if (memo && memo[0] === h.length) return memo[1];
+    var found = null;
+    for (var i = 0; i < h.length; i++) {
+        if (h[i].type !== 'play' || !h[i].cards) continue;
+        for (var j = 0; j < h[i].cards.length; j++) {
+            var c = h[i].cards[j];
+            if (c === 'd3' || c === 'dA') { found = h[i].seat; break; }
+        }
+        if (found !== null) break;
+    }
+    g._llInfer = [h.length, found];
+    return found;
+}
+
+// 队友只剩 1 张且正好排在自己下手：喂出去的牌不会被对手截胡
+function mateIsNextSolo(g, name, viewer) {
+    var v = (viewer === undefined) ? name : viewer;
+    var myTeam = get_team_solo(g, name, v);
+    var myIdx = g.players.indexOf(name);
+    var nxt = (myIdx + 1) % 4;
+    var nxtName = g.players[nxt];
+    return get_team_solo(g, nxtName, v) === myTeam &&
+           (g.hands[nxt] ? g.hands[nxt].length : 0) === 1;
 }
 
 
@@ -2417,7 +2454,16 @@ function getAllPlaysFull(hand) {
         if (!p) return;
         var k;
         if (noFlush) {
-            k = p.type + '|' + cards.map(function(c){ return c.slice(1); }).sort().join(',');
+            // 单张/对子/顺子比花色，同点数不同花色的牌不能当成同一手，否则会漏掉能压的牌
+            if (p.type === 'single') {
+                k = 'single|' + cards[0];
+            } else if (p.type === 'pair') {
+                k = 'pair|' + p.r + '|' + p.s;
+            } else if (p.type === 'straight') {
+                k = 'straight|' + p.r + '|' + p.s;
+            } else {
+                k = p.type + '|' + cards.map(function(c){ return c.slice(1); }).sort().join(',');
+            }
         } else {
             k = cards.slice().sort().join(',');
         }
@@ -2805,7 +2851,7 @@ function scoreCandidate(g, name, cards, base, isLead) {
     if (mateMin === 1) {
         // 队友剩 1 张 → 我首出时优先给队友机会
         if (isLead) {
-            if (p.type === 'single') score += 700;
+            if (p.type === 'single') score += mateIsNextSolo(g, name) ? 700 : 120;
             else if (p.type === 'pair') score -= 300;
             else if (p.type === 'triple' || p.type === 'full' ||
                      p.type === 'bomb' || p.type === 'sf') score -= 600;
@@ -2890,6 +2936,189 @@ function pickTopK(scored) {
     return scored[n - 1].cards;
 }
 
+/* ============ 残局精确求解（单机 AI 也掌握全部手牌，直接搜到终局） ============ */
+// 与联机版同一套 minimax + alpha-beta：残局分支有限，按真实计分选最优；
+// 中局分支太多，超出节点预算就回退启发式评分。
+var EG_MAX_CARDS = 13;
+var EG_NODE_BUDGET = 15000;
+var _egBudgetEx = {};
+
+var _egAnaCache = new Map();
+function _egAna(cards) {
+    var k = cards.slice().sort().join(',');
+    var v = _egAnaCache.get(k);
+    if (v === undefined) {
+        if (_egAnaCache.size > 20000) _egAnaCache.clear();
+        v = analyze(cards);
+        _egAnaCache.set(k, v);
+    }
+    return v;
+}
+
+// 求解要求决策者能分辨阵营，否则回退 'U' 的启发式
+function _egIdentityKnownSolo(g, hero) {
+    if (g.team_mode === '2v2') return true;
+    if (g.landlord_public || g.players.indexOf(hero) === g.landlord) return true;
+    return inferLandlordSolo(g) !== null;
+}
+
+function _egNextAlive(hands, seat) {
+    var n = (seat + 1) % 4, cnt = 0;
+    while (hands[n].length === 0) {
+        n = (n + 1) % 4; cnt++;
+        if (cnt > 4) break;
+    }
+    return n;
+}
+
+// 按计分规则算终局 hero 的分数变化。finishers 为出完顺序（可能不满 4 人）。
+function _egFinalScore(g, hero, finishers) {
+    var players = g.players;
+    var rankings = finishers.slice();
+    for (var i = 0; i < players.length; i++) {
+        if (rankings.indexOf(players[i]) === -1) rankings.push(players[i]);
+    }
+    var heroIdx = players.indexOf(hero);
+    if (g.team_mode === '2v2') {
+        var tA = g.team_a;
+        var p1Idx = players.indexOf(rankings[0]);
+        var winIdx = tA.indexOf(p1Idx) !== -1 ? tA :
+                     [0,1,2,3].filter(function(i){ return tA.indexOf(i) === -1; });
+        var mateIdx = winIdx[0] === p1Idx ? winIdx[1] : winIdx[0];
+        var mateRank = rankings.indexOf(players[mateIdx]) + 1;
+        var sc = mateRank === 2 ? 2 : (mateRank === 3 ? 1 : 0);
+        return winIdx.indexOf(heroIdx) !== -1 ? sc : -sc;
+    }
+    var lIdx = g.landlord;
+    var lName = players[lIdx];
+    var rank = rankings.indexOf(lName) + 1;
+    if (g.choice === 'call') {
+        if (rank === 1) return heroIdx === lIdx ? 12 : -4;
+        return heroIdx === lIdx ? -12 : 4;
+    }
+    var lsc = {1: 6, 2: 3, 3: -3, 4: -6}[rank];
+    return heroIdx === lIdx ? lsc : -lsc / 2;
+}
+
+// 返回 {found, cards}；cards=null 表示最优是过牌；null 表示未求解（交给启发式）
+function endgameBestMoveSolo(g, name) {
+    if (!g.history || g.history.length === 0) return null;   // 开局首出有 ♣4 特殊规则
+    var total = 0, hi;
+    for (hi = 0; hi < 4; hi++) total += g.hands[hi] ? g.hands[hi].length : 0;
+    if (total > EG_MAX_CARDS) return null;
+    if (!_egIdentityKnownSolo(g, name)) return null;
+
+    var players = g.players;
+    var hero = name;
+    var heroTeam = get_team_solo(g, hero, hero);
+    var maxTurn = players.map(function(p){ return get_team_solo(g, p, hero) === heroTeam; });
+    var memo = new Map();
+    var nodes = 0;
+
+    function search(hands, turn, curCards, passCount, leader, rankings, alpha, beta) {
+        if (++nodes > EG_NODE_BUDGET) throw _egBudgetEx;
+        var key = hands.map(function(h){ return h.join(','); }).join('|') + '#' + turn + '#' +
+                  (curCards ? curCards.join(',') : '') + '#' + passCount + '#' + leader + '#' +
+                  rankings.join(',');
+        var hit = memo.get(key);
+        if (hit && hit[2]) return hit;
+
+        var base = curCards ? _egAna(curCards) : null;
+        var hand = hands[turn];
+        var plays = getAllPlaysFull(hand);
+        if (base) {
+            plays = plays.filter(function(cs){ return can_beat(_egAna(cs), base); });
+        }
+        var maximizing = maxTurn[turn];
+        var bestVal = null, bestMove = null, cutoff = false;
+
+        function upd(v, mv) {
+            if (bestVal === null || (maximizing ? v > bestVal : v < bestVal)) {
+                bestVal = v; bestMove = mv;
+            }
+            if (maximizing) { if (bestVal > alpha) alpha = bestVal; }
+            else { if (bestVal < beta) beta = bestVal; }
+            if (alpha >= beta) cutoff = true;
+        }
+
+        for (var pi = 0; pi < plays.length; pi++) {
+            var cs = plays[pi];
+            var remain = hand.slice();
+            for (var ci = 0; ci < cs.length; ci++) remain.splice(remain.indexOf(cs[ci]), 1);
+            var newHands = hands.slice();
+            newHands[turn] = remain;
+            var newRankings = rankings, endScore = null;
+            if (remain.length === 0 && rankings.indexOf(players[turn]) === -1) {
+                newRankings = rankings.concat([players[turn]]);
+                // 终局判定，与 checkSoloGameEnd 完全一致
+                var end = false;
+                if (g.team_mode === '1v3') {
+                    if (g.choice === 'call' || turn === g.landlord) end = true;
+                }
+                if (!end && newRankings.length >= 3) end = true;
+                if (!end && g.team_mode === '2v2' && newRankings.length >= 2) {
+                    var i1 = players.indexOf(newRankings[0]);
+                    var i2 = players.indexOf(newRankings[1]);
+                    if ((g.team_a.indexOf(i1) !== -1) === (g.team_a.indexOf(i2) !== -1)) end = true;
+                }
+                if (end) endScore = _egFinalScore(g, hero, newRankings);
+            }
+            if (endScore !== null) {
+                upd(endScore, cs);
+            } else {
+                var child = search(newHands, _egNextAlive(newHands, turn),
+                                   cs.slice().sort(), 0, turn, newRankings, alpha, beta);
+                upd(child[0], cs);
+            }
+            if (cutoff) break;
+        }
+
+        if (!cutoff && base) {
+            var alive = 0;
+            for (var hi2 = 0; hi2 < hands.length; hi2++) if (hands[hi2].length) alive++;
+            var res;
+            if (passCount + 1 >= alive - 1) {
+                var nt = hands[leader].length ? leader : _egNextAlive(hands, leader);
+                res = search(hands, nt, null, 0, leader, rankings, alpha, beta);
+            } else {
+                res = search(hands, _egNextAlive(hands, turn), curCards,
+                             passCount + 1, leader, rankings, alpha, beta);
+            }
+            upd(res[0], null);
+        }
+
+        var out = [bestVal, bestMove, !cutoff];
+        if (!cutoff) memo.set(key, out);
+        return out;
+    }
+
+    var startHands = g.hands.map(function(h){ return h.slice().sort(); });
+    var cur = g.currentPlay;
+    var curCards = cur ? cur.cards.slice().sort() : null;
+    try {
+        var r = search(startHands, g.turn, curCards, g.pass_count || 0,
+                       g.trick_leader || 0, (g.rankings || []).slice(), -1e18, 1e18);
+        if (r[0] === null) return null;
+        return { found: true, cards: r[1] };
+    } catch (e) {
+        return null;
+    }
+}
+
+// 1v3 叫分 EV：按实际结算（叫 ±12 / 藏 +6/+3/-3/-6 / 弃 -3）用序次概率算期望
+function landlordChoice(power) {
+    function lg(x) { return 1.0 / (1.0 + Math.exp(-x)); }
+    var pLe1 = lg((power - 30.0) / 7.0);
+    var pLe2 = Math.max(lg((power - 26.0) / 9.0), pLe1);
+    var pLe3 = Math.max(lg((power - 18.0) / 9.0), pLe2);
+    var p1 = pLe1, p2 = pLe2 - pLe1, p3 = pLe3 - pLe2, p4 = 1 - pLe3;
+    var evHide = 6 * p1 + 3 * p2 - 3 * p3 - 6 * p4;
+    var evCall = 24 * p1 - 12;
+    if (evCall > evHide && evCall > -3) return 'call';
+    if (evHide > -3) return 'hide';
+    return 'fold';
+}
+
 // AI 首出
 function ai_lead_solo(g, name) {
     var myIdx = g.players.indexOf(name);
@@ -2918,10 +3147,14 @@ function ai_lead_solo(g, name) {
         if (all[i].length === hand.length) return all[i];
     }
 
-    // 🔥 队友剩 1 张 → 主动喂最小单张（给队友跑的机会）
+    // 残局精确求解
+    var eg = endgameBestMoveSolo(g, name);
+    if (eg && eg.cards) return eg.cards;
+
+    // 🔥 队友只剩 1 张且就在自己下手 → 主动喂最小单张（中间隔了对手会被截胡）
     var sc2 = sideCountsSolo(g, name, name);
     var mateMin2 = sc2[1], oppMin2 = sc2[0];
-    if (mateMin2 === 1 && oppMin2 > 1) {
+    if (mateMin2 === 1 && oppMin2 > 1 && mateIsNextSolo(g, name)) {
         var singles = all.filter(function(cs){ return cs.length === 1; });
         if (singles.length > 0) {
             singles.sort(function(a, b){
@@ -2963,24 +3196,16 @@ function ai_follow_solo(g, name, base) {
         if (all[i].length === hand.length) return all[i];
     }
 
+    // 残局精确求解（cards 为 null 表示最优是过牌）
+    var eg = endgameBestMoveSolo(g, name);
+    if (eg) return eg.cards;
+
     var myTeam = get_team_solo(g, name, name);
     var baseSeat = g.currentPlay.seat;
     var baseTeam = get_team_solo(g, g.players[baseSeat], name);
-    var baseHandCnt = g.hands[baseSeat] ? g.hands[baseSeat].length : 0;
-    var oppMin = sideCountsSolo(g, name, name)[0];
 
-    // 🔥 队友出牌：确认是队友才默认不压。说明：能一手出完的牌在函数开头
-    // 已经无条件优先返回（包括压队友），这里的例外只处理“队友还远、对手快跑完”
-    // 的残局兜底，对手剩 2 张也允许抢。
-    if (myTeam === baseTeam) {
-        if (baseHandCnt >= 3 && oppMin <= 2) {
-            var finishPlay = all.filter(function(cs){
-                return cs.length === hand.length;
-            })[0];
-            if (finishPlay) return finishPlay;
-        }
-        return null;
-    }
+    // 🔥 队友出牌：确认是队友才默认不压。能一手出完的牌在函数开头已无条件优先返回。
+    if (myTeam === baseTeam) return null;
 
     // 认不出阵营（隐藏地主模式）交给正常评分：队友和地主都是 'U'，
     // 按"其他人都还有大牌"过滤会让农民几乎永远不出牌，反而把牌权全让给地主。
@@ -3208,15 +3433,16 @@ function start_new_game_solo() {
             else if (suit_max === 4) power += 2;
             power -= Math.max(0, single_cnt - 4) * 4;    // 散单太多扣分
 
-            if (power >= 40) {
-                // 手牌中上 → 叫地主搏 +12
+            var llChoice = landlordChoice(power);
+            if (llChoice === 'call') {
+                // 手牌够强 → 叫地主搏 +12
                 G.choice = 'call';
                 G.landlord_public = true;
                 G.phase = "play";
                 // 🔥 电脑叫地主：中间弹出“地主”，停留两秒后飞向地主座位
                 showLandlordBadge(G.landlord);
-            } else if (power <= 11) {
-                // 手牌烂 → 弃牌小输
+            } else if (llChoice === 'fold') {
+                // 手牌太烂，藏起来也是大概率第 4 → 直接弃牌小输
                 G.choice = 'fold';
                 solo_settle(G);
                 $('landlord-dialog').classList.add('hidden');
