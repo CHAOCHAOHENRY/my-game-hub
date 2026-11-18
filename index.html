@@ -3766,6 +3766,37 @@ function showLandlordBadge(seatIdx) {
     }, 2000);
 }
 
+// 联机端：地主公开后弹“地主”大字。reveal_time 是服务端权威标记；
+// 老服务端没这个字段时（或漏传），用“地主已公开 + 这局还没出过牌”兜底，保证大字不漏。
+function maybeShowLandlordBadge(game) {
+    if (!game || !game.landlord_public || !game.landlord) return;
+    var rt = game.landlord_reveal_time || 0;
+    if (rt) {
+        if (rt !== window._lastLandlordRevealTime) {
+            window._lastLandlordRevealTime = rt;
+            showLandlordBadge(badgeSeatOf(game));
+        }
+        return;
+    }
+    if (!game.history || game.history.length > 0) return;
+    var key = (game.table || '') + '|' + game.landlord + '|' + (game.my_hand || []).join(',');
+    if (window._llBadgeGameKey === key) return;
+    window._llBadgeGameKey = key;
+    showLandlordBadge(badgeSeatOf(game));
+}
+
+// 地主绝对座位 → 屏幕相对座位。players 是对象数组，不能拿名字直接 indexOf。
+function badgeSeatOf(game) {
+    var idx = -1;
+    if (game.players) {
+        for (var i = 0; i < game.players.length; i++) {
+            var p = game.players[i];
+            if ((p && p.name ? p.name : p) === game.landlord) { idx = i; break; }
+        }
+    }
+    return idx >= 0 ? (idx - game.my_seat + 4) % 4 : -1;
+}
+
 function choiceLandlordSolo(c) {
     playSound('click');
     G.choice = c;
@@ -3992,7 +4023,8 @@ function doSync() {
                 histLen: data.game.history ? data.game.history.length : 0,
                 players: data.game.players,
                 landlord: data.game.landlord,
-                landlord_public: data.game.landlord_public
+                landlord_public: data.game.landlord_public,
+                llrt: data.game.landlord_reveal_time || 0
             });
             if (stateStr !== lastGameStr) {
                 var oldHistLen = lastGameStr ? JSON.parse(lastGameStr).histLen : 0;
@@ -4025,13 +4057,7 @@ function doSync() {
                 }
 
                 lastGameStr = stateStr;
-                if (data.game.landlord_reveal_time &&
-                    data.game.landlord_reveal_time !== window._lastLandlordRevealTime) {
-                    window._lastLandlordRevealTime = data.game.landlord_reveal_time;
-                    var llIdx = data.game.players ? data.game.players.indexOf(data.game.landlord) : -1;
-                    var llSeat = llIdx >= 0 ? (llIdx - data.game.my_seat + 4) % 4 : 0;
-                    showLandlordBadge(llSeat);
-                }
+                maybeShowLandlordBadge(data.game);
                 updateGameState(data.game, myName);
             }
         }
@@ -4111,10 +4137,8 @@ function updateGameState(game, myName) {
 function choiceLandlord(c) {
     if (isSoloMode) return choiceLandlordSolo(c);
     playSound('click');
-    if (c === 'call') {
-        showLandlordBadge(0);
-    }
-    
+    // 联机由服务端记录 reveal_time，四个客户端统一在同步里弹大字，避免自己弹一次、同步又弹一次
+
     fetch(API_BASE + '/api/choice', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table: currentTableId, choice: c, username: document.getElementById('lobby-user-name').textContent, session_id: mySessionId })
