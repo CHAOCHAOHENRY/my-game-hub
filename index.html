@@ -1445,8 +1445,13 @@ function preloadCardVoices() {
 document.addEventListener('pointerdown', function(){ getVoiceCtx(); preloadCardVoices(); }, { once: true });
 document.addEventListener('touchstart', function(){ getVoiceCtx(); preloadCardVoices(); }, { once: true });
 
+var voiceJobs = [];      // 待播的报牌按出牌顺序排队，连续出牌时谁也不会被吞掉
+var voiceBusy = false;   // 当前是否有一段正在播
+
 function stopCardVoice() {
     cardVoiceToken++;
+    voiceJobs = [];
+    voiceBusy = false;
     for (var i = 0; i < cardVoiceAudios.length; i++) {
         var a = cardVoiceAudios[i];
         try {
@@ -1548,48 +1553,81 @@ function warmVoiceSeq(names) {
     }
 }
 
-function playVoiceFile(url, cacheKey) {
-    var a = cacheKey ? audioCache[cacheKey] : null;
-    if (!a) {
-        a = new Audio(url);
-        if (cacheKey) audioCache[cacheKey] = a;
-    }
-    try { a.currentTime = 0; } catch(e){}
-    cardVoiceAudios.push(a);
-    var pr = a.play();
-    if (pr && pr.catch) pr.catch(function(){});
-}
-
+// 报牌入队：一次同步拿到几手新出牌（或自己的出牌和电脑的出牌挨得很近）时，
+// 逐段按顺序播，不再互相打断；每段播完才播下一段
 function playVoiceQueue(names) {
     if (!names || !names.length) return;
-    stopCardVoice();
     preloadCardVoices();
-    if (names.length === 1) { playVoiceFile('sounds/yue/' + names[0] + '.mp3', 'yue/' + names[0]); return; }
+    voiceJobs.push(names.slice());
+    if (voiceJobs.length > 3) voiceJobs.splice(0, voiceJobs.length - 3);   // 积压太多丢最老的
+    if (!voiceBusy) nextVoiceJob();
+}
+
+function nextVoiceJob() {
+    var names = voiceJobs.shift();
+    if (!names) { voiceBusy = false; return; }
+    voiceBusy = true;
     var token = cardVoiceToken;
+    var done = false;
+    var endTimer = null;
+
+    function finish() {
+        if (done) return;
+        done = true;
+        if (endTimer) clearTimeout(endTimer);
+        if (token !== cardVoiceToken) return;   // 已被 stopCardVoice 清场
+        voiceBusy = false;
+        nextVoiceJob();
+    }
+
+    function play(url, key, maxMs) {
+        var a = key ? audioCache[key] : null;
+        if (!a) {
+            a = new Audio(url);
+            if (key) audioCache[key] = a;
+        }
+        try { a.currentTime = 0; } catch(e){}
+        cardVoiceAudios.push(a);
+        a.onended = finish;
+        endTimer = setTimeout(finish, maxMs);   // ended 偶尔不触发（切断/切后台）时按预估时长兜底
+        var pr = a.play();
+        if (pr && pr.catch) pr.catch(function(){ setTimeout(finish, 250); });
+    }
+
+    if (names.length === 1) {
+        play('sounds/yue/' + names[0] + '.mp3', 'yue/' + names[0], 1600);
+        return;
+    }
     // 都解码好了就当场拼好直接播，一点异步都不等
     if (names.every(function(n){ return voiceBufferDone[n]; })) {
-        var ready = names.map(function(n){ return voiceBufferDone[n]; });
-        var url0 = voiceSeqUrl(names, ready);
-        if (url0) { playVoiceFile(url0, 'seq:' + names.join('_')); return; }
+        var bufs = names.map(function(n){ return voiceBufferDone[n]; });
+        var url = voiceSeqUrl(names, bufs);
+        if (url) { play(url, 'seq:' + names.join('_'), voiceSeqMs(bufs)); return; }
     }
-    // 还没解码完：最多等 700ms（电脑约 1.2 秒一手，等太久声音就落在下一家出牌之后了），
-    // 等不到先逐段播，宁可稍微不够顺，也要跟出牌同步
+    // 还没解码完：最多等 700ms（出牌节奏约 1.2 秒一手），等不到先逐段播
     var bufsP = Promise.all(names.map(loadVoiceBuffer));
     var failP = new Promise(function(res){ setTimeout(function(){ res(null); }, 700); });
     Promise.race([bufsP, failP]).then(function(bufs) {
-        if (token !== cardVoiceToken) return;
+        if (done || token !== cardVoiceToken) return;
         var ok = bufs && bufs.every(function(b){ return !!b; });
         var url = ok ? voiceSeqUrl(names, bufs) : null;
-        if (url) { playVoiceFile(url, 'seq:' + names.join('_')); return; }
-        playVoiceQueueFallback(names, token);
+        if (url) { play(url, 'seq:' + names.join('_'), voiceSeqMs(bufs)); return; }
+        playVoiceChain(names, token, finish);
     });
 }
 
-function playVoiceQueueFallback(names, token) {
+function voiceSeqMs(bufs) {
+    var ms = 0;
+    bufs.forEach(function(b){ ms += (b.duration || 1) * 1000; });
+    return Math.min(9000, Math.round(ms) + 600);
+}
+
+// 解码没准备好时的兜底：逐段接力播
+function playVoiceChain(names, token, onDone) {
     var idx = 0;
     function step() {
-        if (token !== cardVoiceToken || idx >= names.length) return;
-        var key = 'yue/' + names[idx];
+        if (token !== cardVoiceToken || idx >= names.length) { onDone(); return; }
+        var key = 'yue/' + names[idx++];
         var a = audioCache[key];
         if (!a) {
             a = new Audio('sounds/' + key + '.mp3');
@@ -1601,7 +1639,6 @@ function playVoiceQueueFallback(names, token) {
         function next() {
             if (advanced) return;
             advanced = true;
-            idx++;
             setTimeout(step, 0);
         }
         a.onended = next;
@@ -4020,6 +4057,7 @@ var syncGen = 0;          // 乐观出牌/过牌后自增，作废此前发出�
 var pendingActionAt = 0;  // 出牌/过牌请求在途时间，期间跳过轮询同步，防止旧状态把刚出的牌“变回来”
 var pendingPlaySig = null;   // 已本地播过音效的那手牌
 var pendingPassSeat = null;  // 已本地播过音效的那次过牌
+var pendingVoiceFrom = null; // 自己出牌/过牌前已见到的历史长度，全量刷新时从这里往后补报
 
 function startSync() {
     if (syncTimer) clearInterval(syncTimer);
@@ -4164,22 +4202,27 @@ function doSync() {
                 var oldHistLen = lastGameStr ? JSON.parse(lastGameStr).histLen : 0;
                 var newHistLen = data.game.history ? data.game.history.length : 0;
                 if (newHistLen > oldHistLen) {
-                    // 电脑座位约 1.2 秒一手，轮询也 1.2 秒一次，一次同步经常拿到两条记录。
+                    // 电脑座位约 1.2 秒一手，轮询也 1.2 秒一次，一次同步经常拿到两条以上记录。
                     // 以前只看最后一条：批尾是过牌时，这手出牌就没声音了。整批里找最后一手出牌来报牌，
                     // 整批都是过牌才放过牌声。
                     var lastPlay = null, lastPass = null;
+                    var scanFrom;
                     if (oldHistLen > 0) {
-                        for (var hi = oldHistLen; hi < newHistLen; hi++) {
-                            var act = data.game.history[hi];
-                            if (!act) continue;
-                            if (act.type === 'play') lastPlay = act;
-                            else if (act.type === 'pass') lastPass = act;
-                        }
+                        scanFrom = oldHistLen;
+                    } else if (pendingVoiceFrom != null) {
+                        // 全量刷新（自己刚出完牌）：网络慢时电脑这几手是 POST 期间发生的，
+                        // 从自己行动前的历史位置往后补，别只报最后一条
+                        scanFrom = Math.min(pendingVoiceFrom, newHistLen - 1);
+                        pendingVoiceFrom = null;
                     } else {
-                        // 全量刷新（如自己刚出完牌）时历史里全是旧记录，只看最后一条，避免重播旧牌
-                        var lastAction = data.game.history[newHistLen - 1];
-                        if (lastAction && lastAction.type === 'play') lastPlay = lastAction;
-                        else if (lastAction && lastAction.type === 'pass') lastPass = lastAction;
+                        // 刚进牌桌/重开：历史里全是旧记录，只看最后一条，避免重播旧牌
+                        scanFrom = newHistLen - 1;
+                    }
+                    for (var hi = scanFrom; hi < newHistLen; hi++) {
+                        var act = data.game.history[hi];
+                        if (!act) continue;
+                        if (act.type === 'play') lastPlay = act;
+                        else if (act.type === 'pass') lastPass = act;
                     }
                     if (lastPlay) {
                         // 自己刚乐观出的牌已经在按下的瞬间播过音效，这里不再重复
@@ -4370,6 +4413,7 @@ function humanPlay() {
 
     pendingPlaySig = cards.slice().sort().join(',');
     pendingActionAt = Date.now();
+    pendingVoiceFrom = G.history ? G.history.length : 0;   // 手机网络慢时，POST 期间电脑出的牌也要补报
     optimisticOwnPlay(cards, p);
     
     fetch(API_BASE + '/api/play', {
@@ -4436,6 +4480,7 @@ function humanPass() {
 
     pendingPassSeat = mySeat;
     pendingActionAt = Date.now();
+    pendingVoiceFrom = G.history ? G.history.length : 0;
     optimisticOwnPass();
 
     fetch(API_BASE + '/api/pass', {
@@ -4936,6 +4981,7 @@ document.getElementById('confirm-dialog').addEventListener('click', function(e) 
 
 // 中途离开回到主菜单：不刷新页面，保留已加载好的牌面/音效资源
 function resetGameUIForMenu() {
+    stopCardVoice();
     if (llBadgeTimer) { clearTimeout(llBadgeTimer); llBadgeTimer = null; }
     llBadgeActive = false;
     var badge = $('landlord-badge');
