@@ -1442,38 +1442,91 @@ function stopCardVoice() {
     cardVoiceAudios = [];
 }
 
-// iOS/iPadOS 的 WebAudio 输出会被侧边静音开关整个掐掉，而 <audio> 标签照常出声，
-// 在手机上就表现为“只有过牌声、没有出牌声”；这类设备直接用 <audio> 连播
-var VOICE_USE_AUDIO_TAG = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// 两三个字的报牌（对7、三带二…）如果逐个 <audio> 接力播，每个文件自带的头尾静音
+// 加切换延迟叠起来，字和字之间就有明显停顿。这里把裁掉静音的几段 PCM 按重叠
+// 拼成一整段 WAV 再播放：一次出声，中间没有接缝，也不依赖 WebAudio 输出
+// （iPhone 侧边静音开关会把 WebAudio 整个静音掉）。
+var voiceSeqUrls = {};
+var voiceSeqOrder = [];
+
+function composeVoiceUrl(bufs) {
+    var sr = bufs[0].sampleRate;
+    var overlap = Math.round(sr * VOICE_OVERLAP);
+    var total = 0;
+    for (var i = 0; i < bufs.length; i++) total += bufs[i].length - (i ? overlap : 0);
+    if (total <= 0) return null;
+    var mix = new Float32Array(total);
+    var pos = 0;
+    for (var i = 0; i < bufs.length; i++) {
+        var b = bufs[i];
+        var start = pos - (i ? overlap : 0);   // 后一个字提前咬住前一个字的尾音
+        var ch0 = b.getChannelData(0);
+        var ch1 = b.numberOfChannels > 1 ? b.getChannelData(1) : null;
+        for (var j = 0; j < b.length; j++) {
+            mix[start + j] += ch1 ? (ch0[j] + ch1[j]) * 0.5 : ch0[j];
+        }
+        pos = start + b.length;
+    }
+    // 编码成 16 位 PCM WAV
+    var bytes = 44 + total * 2;
+    var ab = new ArrayBuffer(bytes);
+    var dv = new DataView(ab);
+    function str(off, s) { for (var k = 0; k < 4; k++) dv.setUint8(off + k, s.charCodeAt(k)); }
+    str(0, 'RIFF'); dv.setUint32(4, bytes - 8, true); str(8, 'WAVE');
+    str(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);
+    dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true);
+    dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    str(36, 'data'); dv.setUint32(40, total * 2, true);
+    for (var k = 0; k < total; k++) {
+        var v = Math.max(-1, Math.min(1, mix[k]));
+        dv.setInt16(44 + k * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+    }
+    return URL.createObjectURL(new Blob([ab], { type: 'audio/wav' }));
+}
+
+function voiceSeqUrl(names, bufs) {
+    var key = names.join('_');
+    if (voiceSeqUrls[key]) return voiceSeqUrls[key];
+    var url = composeVoiceUrl(bufs);
+    if (!url) return null;
+    voiceSeqUrls[key] = url;
+    voiceSeqOrder.push(key);
+    if (voiceSeqOrder.length > 60) {
+        var old = voiceSeqOrder.shift();
+        try { URL.revokeObjectURL(voiceSeqUrls[old]); } catch(e){}
+        delete voiceSeqUrls[old];
+    }
+    return url;
+}
+
+function playVoiceFile(url, cacheKey) {
+    var a = cacheKey ? audioCache[cacheKey] : null;
+    if (!a) {
+        a = new Audio(url);
+        if (cacheKey) audioCache[cacheKey] = a;
+    }
+    try { a.currentTime = 0; } catch(e){}
+    cardVoiceAudios.push(a);
+    var pr = a.play();
+    if (pr && pr.catch) pr.catch(function(){});
+}
 
 function playVoiceQueue(names) {
     if (!names || !names.length) return;
     stopCardVoice();
     preloadCardVoices();
+    if (names.length === 1) { playVoiceFile('sounds/yue/' + names[0] + '.mp3', 'yue/' + names[0]); return; }
     var token = cardVoiceToken;
-    if (VOICE_USE_AUDIO_TAG) { playVoiceQueueFallback(names, token); return; }
-    // 缓冲加载可能卡住（iOS 解码个别文件偶尔不回调）或网络慢，超时就改用 <audio> 播，
-    // 保证有过牌音就一定也有出牌音；缓冲之后加载完，后续出牌会自动恢复无缝连播
+    // 缓冲加载可能卡住（iOS 解码个别文件偶尔不回调）或网络慢，超时就退回逐个 <audio> 播，
+    // 保证有过牌音就一定也有出牌音；等缓冲好了之后，后续出牌自动恢复无缝拼接
     var bufsP = Promise.all(names.map(loadVoiceBuffer));
     var failP = new Promise(function(res){ setTimeout(function(){ res(null); }, 1600); });
     Promise.race([bufsP, failP]).then(function(bufs) {
         if (token !== cardVoiceToken) return;
         var ok = bufs && bufs.every(function(b){ return !!b; });
-        var ctx = ok ? getVoiceCtx() : null;
-        // 音频上下文被系统挂起（接电话、切后台、锁屏后常见）时 start() 会静默无声，
-        // 这种情况也退回 <audio>，避免整局“只有过牌声、没有出牌声”
-        if (!ctx || ctx.state !== 'running') { playVoiceQueueFallback(names, token); return; }
-        // 裁剪后首尾相接，并让后一段稍微提前咬住前一段的尾音，避免换字时出现空档
-        var t = ctx.currentTime + 0.01;
-        bufs.forEach(function(b) {
-            var src = ctx.createBufferSource();
-            src.buffer = b;
-            src.connect(ctx.destination);
-            src.start(t);
-            t += b.duration - Math.min(VOICE_OVERLAP, b.duration * 0.4);
-            cardVoiceAudios.push(src);
-        });
+        var url = ok ? voiceSeqUrl(names, bufs) : null;
+        if (url) { playVoiceFile(url); return; }
+        playVoiceQueueFallback(names, token);
     });
 }
 
