@@ -4827,6 +4827,33 @@ document.getElementById('btn-orient-menu').onclick = function(){
     setForceRotate(!document.body.classList.contains('force-rotate'));
 };
 
+// 强制横屏时系统键盘不会跟着转，账号/密码仍是竖着输入、还得歪头看：
+// 聚焦输入框先把画面转回竖屏，键盘收起（失焦）后再转回横屏
+var _rotateBackOnBlur = false;
+['auth-user', 'auth-pass'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('focus', function(){
+        if (!document.body.classList.contains('force-rotate')) return;
+        _rotateBackOnBlur = true;
+        document.body.classList.remove('force-rotate');
+        setTimeout(function(){
+            try { el.scrollIntoView({ block: 'center' }); } catch(e){}
+        }, 80);
+    });
+    el.addEventListener('blur', function(){
+        // 账号→密码 连按会先失焦再聚焦，等一拍确认焦点真的离开了
+        setTimeout(function(){
+            if (!_rotateBackOnBlur) return;
+            var a = document.activeElement;
+            if (a && (a.id === 'auth-user' || a.id === 'auth-pass')) return;
+            _rotateBackOnBlur = false;
+            if (document.getElementById('screen-auth').style.display !== 'none' &&
+                !document.body.classList.contains('force-rotate')) setForceRotate(true);
+        }, 120);
+    });
+});
+
 // 中途离开确认：用牌桌风格的弹窗代替浏览器原生 confirm
 var confirmOnOk = null;
 function showGameConfirm(title, msgHtml, okText, onOk) {
