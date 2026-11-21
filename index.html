@@ -1389,9 +1389,23 @@ function fetchVoiceBuffer(name, attempt) {
 
 function loadVoiceBuffer(name) {
     if (voiceBufferCache[name]) return voiceBufferCache[name];
-    var p = fetchVoiceBuffer(name, 0).then(function(buf) {
-        if (!buf) delete voiceBufferCache[name];
-        return buf;
+    // 解码偶发不回调（iOS 上遇到过）时不能把 Promise 永远挂在缓存里，
+    // 超时按失败处理并清掉缓存，下次出牌重新解码
+    var p = new Promise(function(res){
+        var done = false;
+        var timer = setTimeout(function(){
+            if (done) return;
+            done = true;
+            delete voiceBufferCache[name];
+            res(null);
+        }, 6000);
+        fetchVoiceBuffer(name, 0).then(function(buf) {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            if (!buf) delete voiceBufferCache[name];
+            res(buf);
+        });
     });
     voiceBufferCache[name] = p;
     return p;
@@ -1428,16 +1442,28 @@ function stopCardVoice() {
     cardVoiceAudios = [];
 }
 
+// iOS/iPadOS 的 WebAudio 输出会被侧边静音开关整个掐掉，而 <audio> 标签照常出声，
+// 在手机上就表现为“只有过牌声、没有出牌声”；这类设备直接用 <audio> 连播
+var VOICE_USE_AUDIO_TAG = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 function playVoiceQueue(names) {
     if (!names || !names.length) return;
     stopCardVoice();
     preloadCardVoices();
     var token = cardVoiceToken;
-    Promise.all(names.map(loadVoiceBuffer)).then(function(bufs) {
+    if (VOICE_USE_AUDIO_TAG) { playVoiceQueueFallback(names, token); return; }
+    // 缓冲加载可能卡住（iOS 解码个别文件偶尔不回调）或网络慢，超时就改用 <audio> 播，
+    // 保证有过牌音就一定也有出牌音；缓冲之后加载完，后续出牌会自动恢复无缝连播
+    var bufsP = Promise.all(names.map(loadVoiceBuffer));
+    var failP = new Promise(function(res){ setTimeout(function(){ res(null); }, 1600); });
+    Promise.race([bufsP, failP]).then(function(bufs) {
         if (token !== cardVoiceToken) return;
-        var ok = bufs.every(function(b){ return !!b; });
+        var ok = bufs && bufs.every(function(b){ return !!b; });
         var ctx = ok ? getVoiceCtx() : null;
-        if (!ctx) { playVoiceQueueFallback(names, token); return; }
+        // 音频上下文被系统挂起（接电话、切后台、锁屏后常见）时 start() 会静默无声，
+        // 这种情况也退回 <audio>，避免整局“只有过牌声、没有出牌声”
+        if (!ctx || ctx.state !== 'running') { playVoiceQueueFallback(names, token); return; }
         // 裁剪后首尾相接，并让后一段稍微提前咬住前一段的尾音，避免换字时出现空档
         var t = ctx.currentTime + 0.01;
         bufs.forEach(function(b) {
@@ -4030,20 +4056,36 @@ function doSync() {
                 var oldHistLen = lastGameStr ? JSON.parse(lastGameStr).histLen : 0;
                 var newHistLen = data.game.history ? data.game.history.length : 0;
                 if (newHistLen > oldHistLen) {
-                    var lastAction = data.game.history[newHistLen - 1];
-                    if (lastAction.type === 'play') {
+                    // 电脑座位约 1.2 秒一手，轮询也 1.2 秒一次，一次同步经常拿到两条记录。
+                    // 以前只看最后一条：批尾是过牌时，这手出牌就没声音了。整批里找最后一手出牌来报牌，
+                    // 整批都是过牌才放过牌声。
+                    var lastPlay = null, lastPass = null;
+                    if (oldHistLen > 0) {
+                        for (var hi = oldHistLen; hi < newHistLen; hi++) {
+                            var act = data.game.history[hi];
+                            if (!act) continue;
+                            if (act.type === 'play') lastPlay = act;
+                            else if (act.type === 'pass') lastPass = act;
+                        }
+                    } else {
+                        // 全量刷新（如自己刚出完牌）时历史里全是旧记录，只看最后一条，避免重播旧牌
+                        var lastAction = data.game.history[newHistLen - 1];
+                        if (lastAction && lastAction.type === 'play') lastPlay = lastAction;
+                        else if (lastAction && lastAction.type === 'pass') lastPass = lastAction;
+                    }
+                    if (lastPlay) {
                         // 自己刚乐观出的牌已经在按下的瞬间播过音效，这里不再重复
                         var selfPlay = pendingPlaySig &&
-                            lastAction.seat === data.game.my_seat &&
-                            lastAction.cards.slice().sort().join(',') === pendingPlaySig;
+                            lastPlay.seat === data.game.my_seat &&
+                            lastPlay.cards.slice().sort().join(',') === pendingPlaySig;
                         pendingPlaySig = null;
                         pendingPassSeat = null;
-                        if (!selfPlay) playCardVoice(analyze(lastAction.cards), lastAction.cards);
+                        if (!selfPlay) playCardVoice(analyze(lastPlay.cards), lastPlay.cards);
                     } else {
                         pendingPlaySig = null;
-                        if (lastAction.type === 'pass') {
+                        if (lastPass) {
                             // 自己的过牌已经本地播过音效，这里不再重复
-                            var selfPass = pendingPassSeat !== null && lastAction.seat === pendingPassSeat;
+                            var selfPass = pendingPassSeat !== null && lastPass.seat === pendingPassSeat;
                             pendingPassSeat = null;
                             if (!selfPass) playSound('pass');
                         }
