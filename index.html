@@ -741,6 +741,7 @@ body.settle-reveal #seat-3 .opp-hand.open img {
 .prize-item .p-req { color: #ffd75e; font-size: 14px; }
 .prize-item .p-btn { flex: 0 0 auto; width: auto; margin-bottom: 0; background: #8ef09a; color: #0b4d1e; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
 .prize-item .p-btn:disabled { background: #555; color: #999; cursor: not-allowed; }
+.prize-tip { margin: -8px 0 12px; font-size: 13px; line-height: 1.5; color: #bfe3b6; }
 
 #landlord-badge { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(3); font-size: 120px; font-weight: 900; color: #ffe98a; text-shadow: 0 0 30px #ff0000, 4px 4px 0 #b80018; opacity: 0; transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2000; pointer-events: none; letter-spacing: 10px;}
 #landlord-badge.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -1285,6 +1286,7 @@ body.force-rotate #landlord-dialog .landlord-actions button { flex: 1 1 0; width
 <div id="prize-pool-modal" class="dialog-overlay hidden">
     <div class="dialog-box">
         <h2 style="font-size: 26px; color: #ffd700; text-shadow: 2px 2px 0 #b80018;">🎁 奖品池</h2>
+        <p class="prize-tip">注册并登录后联网对战才能获得积分</p>
         <div id="prize-list"></div>
         <button class="btn-call" style="margin-top: 10px;" onclick="document.getElementById('prize-pool-modal').classList.add('hidden')">关闭</button>
     </div>
