@@ -514,6 +514,8 @@ input, button { outline:none; }
 .seat .nameplate .p-name { color:#fff7dd; font-weight: bold;}
 .seat .nameplate .status-tag { font-size: 10px; padding: 1px 5px; border-radius: 999px; background: linear-gradient(#5fd98a,#2f9f5c); color: #fff; border:1px solid rgba(255,255,255,0.35); margin: 0 4px;}
 .seat .nameplate .status-tag.offline { background: linear-gradient(#f29088,#bd443c); }
+#topbar .score-chip .status-tag.bot,
+.seat .nameplate .status-tag.bot { background: linear-gradient(#8fb8e8,#4a7ab5); border-color: rgba(255,255,255,0.4); }
 .seat .nameplate .landlord-tag { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: linear-gradient(#e04a3c,#9e1c14); color: #ffe9c0; border:1px solid rgba(255,215,120,0.55); box-shadow:0 0 8px rgba(200,40,30,0.35); margin: 0 4px;}
 .seat .nameplate .cnt { color:#ffd75e; font-size:12px; margin-left:6px; }
 .seat .opp-hand { margin-top:2px; display:flex; justify-content:center; }
@@ -3992,12 +3994,13 @@ function renderAllSingle(tempG) {
         var chipEl = $('chip-' + i);
         if(chipEl) {
             var pName = tempG.players[i];
+            var botHtml = i !== 0 ? '<span class="status-tag bot">电脑</span>' : '';
             var llHtml = (tempG.landlord === i && tempG.landlord_public) ? '<span class="landlord-tag">地主</span>' : '';
             var tableSc = tempG.table_scores[i] || 0;
-            var chipSig = pName + '|' + llHtml + '|' + tableSc;
+            var chipSig = pName + '|' + botHtml + '|' + llHtml + '|' + tableSc;
             if (chipEl._chipSig !== chipSig) {
                 chipEl._chipSig = chipSig;
-                chipEl.innerHTML = (i===0?'<u>':'') + pName + '</u>' + llHtml + ` <span class="score-val">本场:${tableSc}</span>`;
+                chipEl.innerHTML = (i===0?'<u>':'') + pName + '</u>' + botHtml + llHtml + ` <span class="score-val">本场:${tableSc}</span>`;
             }
         }
     }
@@ -4011,9 +4014,10 @@ function renderAllSingle(tempG) {
         var isLL = (tempG.landlord === i && tempG.landlord_public) ? 1 : 0;
         
         var llHtml = isLL ? '<span class="landlord-tag">地主</span>' : '';
-        var plateHtml = llHtml + '<span class="p-name">'+dispName(tempG.players[i])+'</span><span class="cnt">'+cnt+'张</span>';
+        var botHtml = i !== 0 ? '<span class="status-tag bot">电脑</span>' : '';
+        var plateHtml = botHtml + llHtml + '<span class="p-name">'+dispName(tempG.players[i])+'</span><span class="cnt">'+cnt+'张</span>';
         var faceCards = (i !== 0 && revealOpen) ? tempG.hands[i] : null;
-        setSeatBox(box, plateHtml, i + '|' + tempG.players[i] + '|' + cnt + '|' + isLL, tempG.turn === i, i !== 0 ? cnt : 0, faceCards);
+        setSeatBox(box, plateHtml, i + '|' + tempG.players[i] + '|' + cnt + '|' + isLL + '|' + botHtml, tempG.turn === i, i !== 0 ? cnt : 0, faceCards);
     }
     
     var el = $('trick-center'); var stat = $('trick-status');
